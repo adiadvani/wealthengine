@@ -797,6 +797,49 @@
       ce.innerHTML = `${change>=0?'↑':'↓'} ${formatCurrency(Math.abs(change))}`;
     }
     
+    // Downsample data to target number of points for smooth chart rendering
+    function downsampleData(data, targetPoints) {
+      if (data.length <= targetPoints) return data;
+      
+      const result = [];
+      const step = (data.length - 1) / (targetPoints - 1);
+      
+      for (let i = 0; i < targetPoints; i++) {
+        const idx = Math.round(i * step);
+        result.push(data[idx]);
+      }
+      
+      // Always include the last point for accuracy
+      if (result[result.length - 1] !== data[data.length - 1]) {
+        result[result.length - 1] = data[data.length - 1];
+      }
+      
+      return result;
+    }
+    
+    // Aggregate to weekly data points (every 7 days, taking the last value of each week)
+    function aggregateWeekly(data) {
+      if (data.length <= 100) return data;
+      
+      const result = [];
+      let weekStart = null;
+      let lastPoint = null;
+      
+      data.forEach(p => {
+        const date = new Date(p.date);
+        const weekNum = Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
+        
+        if (weekStart !== weekNum) {
+          if (lastPoint) result.push(lastPoint);
+          weekStart = weekNum;
+        }
+        lastPoint = p;
+      });
+      
+      if (lastPoint) result.push(lastPoint);
+      return result;
+    }
+    
     function renderChart() {
       const h = processHistory();
       if (!h.length) return;
@@ -809,31 +852,46 @@
         data = h.filter(p => new Date(p.date) >= cut);
       }
       
+      // Downsample for smooth rendering
+      // For "all" view with lots of data, use weekly aggregation
+      // For shorter ranges, use simple downsampling to ~150 points max
+      let chartData;
+      if (chartRange === 'all' && data.length > 200) {
+        chartData = aggregateWeekly(data);
+      } else if (data.length > 150) {
+        chartData = downsampleData(data, 150);
+      } else {
+        chartData = data;
+      }
+      
+      log(`Chart: ${data.length} points -> ${chartData.length} displayed`);
+      
       const ctx = document.getElementById('netWorthChart').getContext('2d');
       if (netWorthChart) netWorthChart.destroy();
       
-      // Subtle gradient fill
+      // Subtle gradient fill - very light
       const grad = ctx.createLinearGradient(0, 0, 0, 320);
-      grad.addColorStop(0, 'rgba(0,122,255,0.15)');
-      grad.addColorStop(0.5, 'rgba(0,122,255,0.05)');
+      grad.addColorStop(0, 'rgba(0,122,255,0.08)');
       grad.addColorStop(1, 'rgba(0,122,255,0)');
       
       netWorthChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: data.map(p => p.date),
+          labels: chartData.map(p => p.date),
           datasets: [{
-            data: data.map(p => p.corrected),
+            data: chartData.map(p => p.corrected),
             borderColor: '#007AFF',
             backgroundColor: grad,
             fill: true,
-            tension: 0.4,
+            tension: 0.3,
             pointRadius: 0,
-            pointHoverRadius: 6,
+            pointHoverRadius: 5,
             pointHoverBackgroundColor: '#007AFF',
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2,
-            borderWidth: 2
+            borderWidth: 2,
+            borderJoinStyle: 'round',
+            borderCapStyle: 'round'
           }]
         },
         options: {
