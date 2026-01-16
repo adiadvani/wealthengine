@@ -3,608 +3,461 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wealth Engine - Wealthica Add-on</title>
+  <title>Wealth Engine</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
-    body {
-      background: #0D0D0D;
-      color: #F5F5F5;
-      font-family: 'Sora', sans-serif;
-      min-height: 100vh;
-      position: relative;
-      overflow-x: hidden;
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+      --glass-blur: 20px;
+      --text-primary: rgba(0, 0, 0, 0.85);
+      --text-secondary: rgba(0, 0, 0, 0.55);
+      --text-tertiary: rgba(0, 0, 0, 0.35);
+      --accent: #007AFF;
+      --accent-light: rgba(0, 122, 255, 0.12);
+      --green: #34C759;
+      --red: #FF3B30;
+      --orange: #FF9500;
+      --bg-gradient: linear-gradient(180deg, #F2F2F7 0%, #E5E5EA 100%);
     }
     
-    /* Glow effects */
-    .glow-1 {
-      position: fixed;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
-      background: radial-gradient(circle, #E07A3A 0%, transparent 70%);
-      opacity: 0.1;
-      top: -200px;
-      left: -200px;
-      pointer-events: none;
-      filter: blur(60px);
-      z-index: 0;
-    }
-    .glow-2 {
-      position: fixed;
-      width: 400px;
-      height: 400px;
-      border-radius: 50%;
-      background: radial-gradient(circle, #F5A623 0%, transparent 70%);
-      opacity: 0.08;
-      bottom: -100px;
-      right: -100px;
-      pointer-events: none;
-      filter: blur(60px);
-      z-index: 0;
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-gradient);
+      min-height: 100vh;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
     }
     
     .container {
       max-width: 1400px;
       margin: 0 auto;
       padding: 24px;
-      position: relative;
-      z-index: 1;
     }
     
-    /* Header */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+    }
+    
     .header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 16px;
+      padding: 16px 24px;
+      margin-bottom: 20px;
     }
+    
     .logo {
       display: flex;
       align-items: center;
       gap: 12px;
     }
+    
     .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, #E07A3A 0%, #D45A1A 100%);
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
-      font-size: 18px;
-      color: #0D0D0D;
-    }
-    .logo-text {
-      font-size: 22px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #E07A3A 0%, #F5A623 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 20px;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
     }
     
-    /* Status Badge */
-    .status-badge {
+    .logo-text {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .status-pill {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      padding: 6px 12px;
-      border-radius: 6px;
-      background: rgba(78, 205, 196, 0.1);
-      color: #4ECDC4;
+      padding: 8px 16px;
+      background: rgba(52, 199, 89, 0.12);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--green);
     }
+    
     .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
+      width: 8px;
+      height: 8px;
       background: currentColor;
+      border-radius: 50%;
       animation: pulse 2s infinite;
     }
+    
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-    .status-badge.error {
-      background: rgba(231, 76, 60, 0.1);
-      color: #E74C3C;
-    }
-    .status-badge.error .status-dot {
-      animation: none;
-    }
     
-    /* RPP Settings */
-    .rpp-settings {
+    .rpp-input-group {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: rgba(245, 166, 35, 0.1);
-      border: 1px solid rgba(245, 166, 35, 0.3);
-      padding: 10px 16px;
-      border-radius: 10px;
-    }
-    .rpp-settings label {
-      font-size: 12px;
-      color: #F5A623;
-      font-weight: 500;
-    }
-    .rpp-settings input {
-      width: 120px;
-      padding: 8px 12px;
-      background: #0D0D0D;
-      border: 1px solid #333;
-      border-radius: 6px;
-      color: #F5F5F5;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-    }
-    .rpp-settings input:focus {
-      outline: none;
-      border-color: #F5A623;
-    }
-    .rpp-settings button {
-      padding: 8px 16px;
-      background: #F5A623;
-      border: none;
-      border-radius: 6px;
-      color: #0D0D0D;
-      font-weight: 600;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .rpp-settings button:hover {
-      background: #E09A1A;
     }
     
-    /* Stats Grid */
+    .rpp-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    .rpp-input {
+      width: 120px;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .rpp-input:focus {
+      outline: none;
+      background: white;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    
+    .btn {
+      padding: 10px 18px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    
+    .btn:hover {
+      background: #0066DD;
+    }
+    
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
+    
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    
     .stat-card {
-      background: linear-gradient(145deg, #1A1A1A 0%, #141414 100%);
-      border: 1px solid #252525;
-      border-radius: 14px;
       padding: 20px;
-      position: relative;
-      overflow: hidden;
     }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, #E07A3A, #F5A623);
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    .stat-card:hover::before {
-      opacity: 1;
-    }
+    
     .stat-label {
-      color: #888;
-      font-size: 11px;
-      font-weight: 500;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
+    
     .stat-value {
-      font-size: 26px;
+      font-size: 32px;
       font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-      color: #F5F5F5;
-    }
-    .stat-value.positive { color: #4ECDC4; }
-    .stat-value.negative { color: #E74C3C; }
-    .stat-change {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      margin-top: 6px;
-    }
-    .stat-change.positive { color: #4ECDC4; }
-    .stat-change.negative { color: #E74C3C; }
-    .stat-subtext {
-      font-size: 10px;
-      color: #666;
-      margin-top: 4px;
+      color: var(--text-primary);
+      letter-spacing: -0.5px;
     }
     
-    /* Chart Section */
-    .chart-section {
-      background: linear-gradient(145deg, #1A1A1A 0%, #141414 100%);
-      border: 1px solid #252525;
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 24px;
+    .stat-change {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
     }
+    
+    .stat-change.positive {
+      background: rgba(52, 199, 89, 0.12);
+      color: var(--green);
+    }
+    
+    .stat-change.negative {
+      background: rgba(255, 59, 48, 0.12);
+      color: var(--red);
+    }
+    
+    .stat-subtext {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 6px;
+    }
+    
+    .chart-section {
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #F5F5F5;
-    }
-    .chart-controls {
-      display: flex;
-      gap: 8px;
-    }
-    .chart-btn {
-      padding: 6px 14px;
-      background: transparent;
-      border: 1px solid #333;
-      border-radius: 6px;
-      color: #888;
-      font-size: 11px;
-      font-family: 'Sora', sans-serif;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .chart-btn:hover {
-      border-color: #E07A3A;
-      color: #E07A3A;
-    }
-    .chart-btn.active {
-      background: #E07A3A;
-      border-color: #E07A3A;
-      color: #0D0D0D;
-    }
-    .chart-container {
-      height: 300px;
-      position: relative;
     }
     
-    /* Main Grid */
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .chart-controls {
+      display: flex;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.04);
+      padding: 4px;
+      border-radius: 10px;
+    }
+    
+    .chart-btn {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    
+    .chart-btn.active {
+      background: white;
+      color: var(--text-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .chart-container {
+      height: 320px;
+    }
+    
     .main-grid {
       display: grid;
-      grid-template-columns: 1fr 360px;
-      gap: 24px;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
     }
-    @media (max-width: 900px) {
+    
+    @media (max-width: 1000px) {
       .main-grid { grid-template-columns: 1fr; }
     }
     
-    /* Accounts Section */
-    .accounts-section {
-      background: linear-gradient(145deg, #1A1A1A 0%, #141414 100%);
-      border: 1px solid #252525;
-      border-radius: 16px;
+    .holdings-section, .accounts-section {
       padding: 24px;
     }
     
-    /* Category Groups */
-    .category-group {
-      margin-bottom: 12px;
-    }
-    .category-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      background: #141414;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-bottom: 6px;
-      border: 1px solid #252525;
-      transition: all 0.2s ease;
-    }
-    .category-header:hover {
-      border-color: #333;
-    }
-    .category-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .category-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-    .category-name {
-      font-weight: 500;
-      font-size: 13px;
-      text-transform: capitalize;
-    }
-    .category-total {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: #888;
-    }
-    .category-chevron {
-      color: #666;
-      font-size: 10px;
-      transition: transform 0.2s ease;
-    }
-    .category-chevron.expanded {
-      transform: rotate(180deg);
-    }
-    
-    /* Account Rows */
-    .account-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      background: #0D0D0D;
-      border-radius: 8px;
-      margin-bottom: 4px;
-      border: 1px solid transparent;
-      transition: all 0.2s ease;
-    }
-    .account-row:hover {
-      border-color: #333;
-      background: #141414;
-    }
-    .account-row.manual {
-      border-left: 2px solid #F5A623;
-    }
-    .account-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 0;
-    }
-    .account-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
-    .account-details {
+    .holdings-list {
       display: flex;
       flex-direction: column;
-      gap: 1px;
-      min-width: 0;
-    }
-    .account-name {
-      font-weight: 500;
-      font-size: 12px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .account-institution {
-      font-size: 10px;
-      color: #666;
-    }
-    .account-balance {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    
-    /* Holdings Section */
-    .holdings-section {
-      background: linear-gradient(145deg, #1A1A1A 0%, #141414 100%);
-      border: 1px solid #252525;
-      border-radius: 16px;
-      padding: 24px;
-    }
-    .holdings-grid {
-      display: grid;
       gap: 8px;
       max-height: 400px;
       overflow-y: auto;
     }
+    
     .holding-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 10px 12px;
-      background: #0D0D0D;
-      border-radius: 8px;
-    }
-    .holding-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .holding-symbol {
-      font-weight: 600;
-      font-size: 13px;
-      color: #E07A3A;
-    }
-    .holding-name {
-      font-size: 10px;
-      color: #666;
-      max-width: 150px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .holding-value {
-      text-align: right;
-    }
-    .holding-amount {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-    }
-    .holding-shares {
-      font-size: 10px;
-      color: #666;
+      padding: 14px 16px;
+      background: rgba(0, 0, 0, 0.02);
+      border-radius: 12px;
     }
     
-    /* Allocation Chart */
+    .holding-symbol {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    
+    .holding-name {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+    
+    .holding-amount {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    
+    .holding-shares {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+    
+    .account-group { margin-bottom: 16px; }
+    
+    .account-group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    
+    .account-group-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .account-group-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .account-group-name {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    
+    .account-group-total {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    
+    .account-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      margin-left: 22px;
+      border-left: 2px solid rgba(0, 0, 0, 0.06);
+    }
+    
+    .account-row.manual {
+      border-left-color: var(--orange);
+    }
+    
+    .account-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .account-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .account-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .account-institution {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+    
+    .account-balance {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    
+    .account-balance.negative { color: var(--red); }
+    
     .allocation-section {
       margin-top: 20px;
       padding-top: 20px;
-      border-top: 1px solid #252525;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
     }
+    
     .allocation-chart {
       height: 180px;
-      position: relative;
-    }
-    .allocation-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 12px;
-      justify-content: center;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-    }
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
     }
     
-    /* Loading State */
-    .loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 200px;
-      color: #888;
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-tertiary);
     }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid #252525;
-      border-top-color: #E07A3A;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1A1A1A;
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #333;
-      border-radius: 3px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #444;
-    }
-    
-    /* Annotations */
-    .annotations-section {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #252525;
-    }
-    .annotation-item {
-      display: flex;
-      gap: 12px;
-      padding: 10px 12px;
-      background: #0D0D0D;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      border-left: 2px solid #F5A623;
-    }
-    .annotation-date {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: #F5A623;
-      white-space: nowrap;
-    }
-    .annotation-note {
-      font-size: 12px;
-      color: #888;
-    }
-    
-    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <div class="glow-1"></div>
-  <div class="glow-2"></div>
-  
   <div class="container">
-    <!-- Header -->
-    <header class="header">
+    <header class="header glass-panel">
       <div class="logo">
         <div class="logo-icon">W</div>
         <span class="logo-text">Wealth Engine</span>
       </div>
-      
-      <div id="statusBadge" class="status-badge">
+      <div id="statusPill" class="status-pill">
         <span class="status-dot"></span>
-        <span>Connecting to Wealthica...</span>
+        <span>Connecting...</span>
       </div>
-      
-      <div class="rpp-settings">
-        <label>Canada Life RPP:</label>
-        <input type="number" id="rppInput" placeholder="28981.63" step="0.01">
-        <button id="rppSave">Update</button>
+      <div class="rpp-input-group">
+        <span class="rpp-label">Canada Life RPP</span>
+        <input type="number" id="rppInput" class="rpp-input" step="0.01">
+        <button id="rppSave" class="btn">Update</button>
       </div>
     </header>
     
-    <!-- Stats Grid -->
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Net Worth (Corrected)</div>
+      <div class="stat-card glass-panel">
+        <div class="stat-label">Net Worth</div>
         <div class="stat-value" id="netWorthValue">--</div>
         <div class="stat-change" id="netWorthChange"></div>
-        <div class="stat-subtext">Includes Canada Life RPP</div>
+        <div class="stat-subtext">Includes RPP</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Wealthica Total</div>
+      <div class="stat-card glass-panel">
+        <div class="stat-label">Wealthica</div>
         <div class="stat-value" id="wealthicaValue">--</div>
-        <div class="stat-subtext">Synced accounts only</div>
+        <div class="stat-subtext">Synced accounts</div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card glass-panel">
         <div class="stat-label">Canada Life RPP</div>
         <div class="stat-value" id="rppValue">--</div>
         <div class="stat-subtext">Manual entry</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Monthly Change</div>
+      <div class="stat-card glass-panel">
+        <div class="stat-label">30 Day Change</div>
         <div class="stat-value" id="monthlyChange">--</div>
         <div class="stat-subtext" id="monthlyChangeSubtext"></div>
       </div>
     </div>
     
-    <!-- Chart Section -->
-    <div class="chart-section">
+    <div class="chart-section glass-panel">
       <div class="section-header">
-        <h2 class="section-title">Net Worth Over Time</h2>
+        <h2 class="section-title">Net Worth</h2>
         <div class="chart-controls">
           <button class="chart-btn" data-range="6">6M</button>
           <button class="chart-btn" data-range="12">1Y</button>
@@ -615,443 +468,243 @@
       <div class="chart-container">
         <canvas id="netWorthChart"></canvas>
       </div>
-      
-      <!-- Key Annotations -->
-      <div class="annotations-section">
-        <div id="annotationsList"></div>
-      </div>
     </div>
     
-    <!-- Main Grid -->
     <div class="main-grid">
-      <!-- Holdings Section -->
-      <div class="holdings-section">
+      <div class="holdings-section glass-panel">
         <div class="section-header">
           <h2 class="section-title">Holdings</h2>
         </div>
-        <div id="holdingsList" class="holdings-grid">
-          <div class="loading">
-            <div class="spinner"></div>
-            <span>Loading holdings...</span>
-          </div>
+        <div id="holdingsList" class="holdings-list">
+          <div class="empty-state">Loading...</div>
         </div>
       </div>
       
-      <!-- Accounts Section -->
-      <div class="accounts-section">
+      <div class="accounts-section glass-panel">
         <div class="section-header">
           <h2 class="section-title">Accounts</h2>
         </div>
-        <div id="accountsList">
-          <div class="loading">
-            <div class="spinner"></div>
-            <span>Loading accounts...</span>
-          </div>
-        </div>
-        
-        <!-- Allocation -->
+        <div id="accountsList"></div>
         <div class="allocation-section">
-          <h3 class="section-title" style="font-size: 14px; margin-bottom: 12px;">Allocation</h3>
+          <h3 class="section-title" style="font-size:15px;margin-bottom:16px">Allocation</h3>
           <div class="allocation-chart">
             <canvas id="allocationChart"></canvas>
           </div>
-          <div id="allocationLegend" class="allocation-legend"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Wealthica Add-on SDK - using same path as official example -->
   <script src="https://wealthica.github.io/wealthica.js/dist/addon.min.js"></script>
-  
   <script>
-    // ═══════════════════════════════════════════════════════════════════
-    // CANADA LIFE RPP HISTORICAL DATA (from PDFs)
-    // ═══════════════════════════════════════════════════════════════════
-    
     const CANADA_LIFE_HISTORY = {
-      "2023-09": 353.07,
-      "2023-10": 1200.00,
-      "2023-11": 2000.00,
-      "2023-12": 2581.61,
-      "2024-01": 3400.00,
-      "2024-02": 4200.00,
-      "2024-03": 5100.00,
-      "2024-04": 6000.00,
-      "2024-05": 6900.00,
-      "2024-06": 7800.00,
-      "2024-07": 8700.00,
-      "2024-08": 9600.00,
-      "2024-09": 10500.00,
-      "2024-10": 11400.00,
-      "2024-11": 13945.51,
-      "2024-12": 14568.47,
-      "2025-01": 15500.00,
-      "2025-02": 17500.00,
-      "2025-03": 18500.00,
-      "2025-04": 19500.00,
-      "2025-05": 21000.00,
-      "2025-06": 22500.00,
-      "2025-07": 24000.00,
-      "2025-08": 25500.00,
-      "2025-09": 26500.00,
-      "2025-10": 27500.00,
-      "2025-11": 28981.63,
-      "2025-12": 30000.00,
+      "2023-09": 353.07, "2023-10": 1200, "2023-11": 2000, "2023-12": 2581.61,
+      "2024-01": 3400, "2024-02": 4200, "2024-03": 5100, "2024-04": 6000,
+      "2024-05": 6900, "2024-06": 7800, "2024-07": 8700, "2024-08": 9600,
+      "2024-09": 10500, "2024-10": 11400, "2024-11": 13945.51, "2024-12": 14568.47,
+      "2025-01": 15500, "2025-02": 17500, "2025-03": 18500, "2025-04": 19500,
+      "2025-05": 21000, "2025-06": 22500, "2025-07": 24000, "2025-08": 25500,
+      "2025-09": 26500, "2025-10": 27500, "2025-11": 28981.63, "2025-12": 30000,
       "2026-01": 28981.63
     };
     
-    // Key annotations for the chart
-    const ANNOTATIONS = {
-      "2022-05": "Low Point: Part-Time HK",
-      "2023-03": "$4K Tax Refund",
-      "2023-09": "Promotion to $68K + RPP",
-      "2024-02": "Raise to $70K + $2K Bonus",
-      "2025-02": "$4.6K Bonus",
-      "2025-09": "$LAC Stock Tripled"
-    };
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // STATE
-    // ═══════════════════════════════════════════════════════════════════
-    
     let addon = null;
     let currentRPP = parseFloat(localStorage.getItem('wealthengine-rpp')) || 28981.63;
-    let wealthicaData = {
-      history: [],
-      positions: [],
-      institutions: [],
-      totals: { investments: 0, cash: 0, liabilities: 0 }
-    };
+    let wealthicaData = { history: [], positions: [], institutions: [] };
     let netWorthChart = null;
     let allocationChart = null;
     let chartRange = 'all';
     let expandedCategories = { investment: true, cash: true, liability: true };
     
-    // ═══════════════════════════════════════════════════════════════════
-    // UTILITIES
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function formatCurrency(amount) {
-      if (amount === null || amount === undefined) return '--';
-      const abs = Math.abs(amount);
-      if (abs >= 1000000) return `$${(amount / 1000000).toFixed(2)}M`;
-      if (abs >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
-      return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0 }).format(amount);
+    function formatCurrency(n) {
+      if (n == null || isNaN(n)) return '--';
+      const abs = Math.abs(n);
+      if (abs >= 1e6) return `$${(n/1e6).toFixed(2)}M`;
+      if (abs >= 1e3) return `$${(n/1e3).toFixed(1)}K`;
+      return '$' + Math.round(n).toLocaleString();
     }
     
-    function formatFullCurrency(amount) {
-      if (amount === null || amount === undefined) return '--';
-      return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(amount);
+    function formatFull(n) {
+      if (n == null || isNaN(n)) return '--';
+      return '$' + n.toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
     }
     
-    function formatDate(dateStr) {
-      const date = new Date(dateStr);
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${months[date.getMonth()]} '${String(date.getFullYear()).slice(2)}`;
+    function formatDate(d) {
+      const date = new Date(d);
+      const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${m[date.getMonth()]} '${String(date.getFullYear()).slice(2)}`;
     }
     
-    function getMonthKey(date) {
-      const d = new Date(date);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    function getMonthKey(d) {
+      const date = new Date(d);
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
     }
     
-    function getRPPForDate(date) {
-      const monthKey = getMonthKey(date);
-      // Find the closest RPP value at or before this date
-      const sortedKeys = Object.keys(CANADA_LIFE_HISTORY).sort();
-      let rppValue = 0;
-      for (const key of sortedKeys) {
-        if (key <= monthKey) {
-          rppValue = CANADA_LIFE_HISTORY[key];
-        } else {
-          break;
-        }
+    function getRPP(d) {
+      const key = getMonthKey(d);
+      let val = 0;
+      for (const k of Object.keys(CANADA_LIFE_HISTORY).sort()) {
+        if (k <= key) val = CANADA_LIFE_HISTORY[k];
+        else break;
       }
-      return rppValue;
+      return val;
     }
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // WEALTHICA INTEGRATION
-    // ═══════════════════════════════════════════════════════════════════
     
     function initWealthica() {
       addon = new Addon();
-      
-      addon.on('init', function(options) {
-        console.log('Wealthica initialized:', options);
-        updateStatus('Connected to Wealthica', false);
-        loadAllData();
-      });
-      
-      addon.on('reload', function() {
-        console.log('Wealthica reload triggered');
-        loadAllData();
-      });
-      
-      addon.on('update', function(options) {
-        console.log('Wealthica update:', options);
-        loadAllData();
-      });
+      addon.on('init', () => { updateStatus('Live'); loadData(); });
+      addon.on('reload', loadData);
+      addon.on('update', o => console.log('Update:', o));
     }
     
-    async function loadAllData() {
+    async function loadData() {
+      updateStatus('Syncing...');
       try {
-        updateStatus('Syncing data...', false);
-        console.log('Starting data load...');
-        
-        // Load history using addon.request
-        try {
-          const historyResponse = await addon.request({
-            method: 'GET',
-            endpoint: 'history',
-            query: {
-              from: '2021-04-01',
-              to: new Date().toISOString().split('T')[0]
-            }
-          });
-          wealthicaData.history = historyResponse || [];
-          console.log('History loaded:', wealthicaData.history.length, 'points');
-        } catch (e) {
-          console.error('History error:', e);
-        }
-        
-        // Load positions
-        try {
-          const positionsResponse = await addon.request({
-            method: 'GET',
-            endpoint: 'positions',
-            query: { assets: true }
-          });
-          wealthicaData.positions = positionsResponse || [];
-          console.log('Positions loaded:', wealthicaData.positions.length);
-        } catch (e) {
-          console.error('Positions error:', e);
-        }
-        
-        // Load institutions
-        try {
-          const institutionsResponse = await addon.request({
-            method: 'GET',
-            endpoint: 'institutions'
-          });
-          wealthicaData.institutions = institutionsResponse || [];
-          console.log('Institutions loaded:', wealthicaData.institutions.length);
-          console.log('First institution:', wealthicaData.institutions[0]);
-        } catch (e) {
-          console.error('Institutions error:', e);
-        }
-        
-        updateStatus('Live • Synced', false);
-        renderAll();
-        
-      } catch (error) {
-        console.error('Error loading data:', error);
-        updateStatus('Sync error', true);
-      }
+        const [hist, pos, inst] = await Promise.all([
+          addon.request({method:'GET', endpoint:'history', query:{from:'2021-04-01', to:new Date().toISOString().split('T')[0]}}).catch(()=>[]),
+          addon.request({method:'GET', endpoint:'positions', query:{assets:true}}).catch(()=>[]),
+          addon.request({method:'GET', endpoint:'institutions'}).catch(()=>[])
+        ]);
+        wealthicaData = {history: hist||[], positions: pos||[], institutions: inst||[]};
+        console.log('Data:', wealthicaData.history.length, 'hist,', wealthicaData.positions.length, 'pos,', wealthicaData.institutions.length, 'inst');
+        updateStatus('Live');
+        render();
+      } catch(e) { console.error(e); updateStatus('Error'); }
     }
     
-    // ═══════════════════════════════════════════════════════════════════
-    // DATA PROCESSING
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function processHistoryData() {
-      const history = wealthicaData.history;
-      if (!history || !Array.isArray(history)) return [];
-      
-      // Convert to corrected values (add RPP)
-      return history.map(point => {
-        const date = point.date || point.d;
-        // Wealthica returns 'value' or 'networth' depending on endpoint
-        const wealthicaValue = point.value || point.networth || point.v || 0;
-        const rppValue = getRPPForDate(date);
-        return {
-          date: date,
-          wealthica: wealthicaValue,
-          rpp: rppValue,
-          corrected: wealthicaValue + rppValue
-        };
-      }).sort((a, b) => new Date(a.date) - new Date(b.date));
+    function updateStatus(t) {
+      const p = document.getElementById('statusPill');
+      const isErr = t === 'Error';
+      p.innerHTML = `<span class="status-dot"></span><span>${t}</span>`;
+      p.style.background = isErr ? 'rgba(255,59,48,0.12)' : 'rgba(52,199,89,0.12)';
+      p.style.color = isErr ? '#FF3B30' : '#34C759';
     }
     
-    function calculateTotals() {
-      // Wealthica institutions array - each item IS an institution with its own value
-      const institutions = wealthicaData.institutions || [];
-      let investments = 0;
-      let cash = 0;
-      let liabilities = 0;
-      
-      institutions.forEach(inst => {
-        // The balance is directly on the institution object
-        const balance = inst.value || inst.balance || inst.cash || 0;
-        const type = (inst.type || inst.category || '').toLowerCase();
-        const name = (inst.name || '').toLowerCase();
-        
-        // Categorize based on type or name
-        if (type.includes('credit') || type.includes('loan') || type.includes('liability') || 
-            name.includes('visa') || name.includes('amex') || name.includes('credit')) {
-          liabilities += Math.abs(balance);
-        } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving') ||
-                   type.includes('banking') || name.includes('chequing') || name.includes('saving')) {
-          cash += Math.abs(balance);
-        } else {
-          investments += balance;
-        }
+    function processHistory() {
+      return (wealthicaData.history || []).map(p => {
+        const d = p.date || p.d;
+        const w = p.value || p.networth || p.v || 0;
+        const r = getRPP(d);
+        return {date: d, wealthica: w, rpp: r, corrected: w + r};
+      }).sort((a,b) => new Date(a.date) - new Date(b.date));
+    }
+    
+    function calcTotals() {
+      let inv=0, cash=0, liab=0;
+      (wealthicaData.institutions||[]).forEach(i => {
+        const b = i.value || i.balance || i.cash || 0;
+        const t = (i.type||i.category||'').toLowerCase();
+        const n = (i.name||'').toLowerCase();
+        if (t.includes('credit')||t.includes('loan')||n.includes('visa')||n.includes('amex')||n.includes('credit')) liab += Math.abs(b);
+        else if (t.includes('chequing')||t.includes('checking')||t.includes('saving')||n.includes('chequing')||n.includes('savings')) cash += Math.abs(b);
+        else inv += b;
       });
-      
-      wealthicaData.totals = { investments, cash, liabilities };
-      return { investments, cash, liabilities };
+      return {inv, cash, liab};
     }
     
-    // ═══════════════════════════════════════════════════════════════════
-    // RENDERING
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function renderAll() {
+    function render() {
       renderStats();
       renderChart();
       renderAccounts();
       renderHoldings();
       renderAllocation();
-      renderAnnotations();
-    }
-    
-    function updateStatus(message, isError) {
-      const badge = document.getElementById('statusBadge');
-      badge.className = `status-badge ${isError ? 'error' : ''}`;
-      badge.innerHTML = `<span class="status-dot"></span><span>${message}</span>`;
     }
     
     function renderStats() {
-      const history = processHistoryData();
-      const totals = calculateTotals();
+      const h = processHistory();
+      const t = calcTotals();
+      const wTotal = t.inv + t.cash - t.liab;
+      const net = wTotal + currentRPP;
       
-      // Get latest values
-      const wealthicaTotal = totals.investments + totals.cash - totals.liabilities;
-      const correctedNetWorth = wealthicaTotal + currentRPP;
-      
-      // Get previous month for change calculation
-      let monthlyChangeValue = 0;
-      let monthlyChangePercent = 0;
-      if (history.length >= 2) {
-        const current = history[history.length - 1];
-        const previous = history[history.length - 2];
-        monthlyChangeValue = current.corrected - previous.corrected;
-        monthlyChangePercent = previous.corrected ? ((monthlyChangeValue / previous.corrected) * 100) : 0;
+      let change = 0;
+      if (h.length >= 2) {
+        const cur = h[h.length-1].corrected;
+        const prev = h[Math.max(0, h.length-30)]?.corrected || h[0].corrected;
+        change = cur - prev;
       }
       
-      // Update DOM
-      document.getElementById('netWorthValue').textContent = formatCurrency(correctedNetWorth);
-      document.getElementById('wealthicaValue').textContent = formatCurrency(wealthicaTotal);
+      document.getElementById('netWorthValue').textContent = formatCurrency(net);
+      document.getElementById('wealthicaValue').textContent = formatCurrency(wTotal);
       document.getElementById('rppValue').textContent = formatCurrency(currentRPP);
       document.getElementById('rppInput').value = currentRPP.toFixed(2);
       
-      const monthlyEl = document.getElementById('monthlyChange');
-      monthlyEl.textContent = formatCurrency(monthlyChangeValue);
-      monthlyEl.className = `stat-value ${monthlyChangeValue >= 0 ? 'positive' : 'negative'}`;
-      document.getElementById('monthlyChangeSubtext').textContent = `${monthlyChangePercent >= 0 ? '+' : ''}${monthlyChangePercent.toFixed(1)}% vs last month`;
+      const mc = document.getElementById('monthlyChange');
+      mc.textContent = `${change>=0?'+':''}${formatCurrency(change)}`;
+      mc.style.color = change >= 0 ? '#34C759' : '#FF3B30';
       
-      const changeEl = document.getElementById('netWorthChange');
-      changeEl.className = `stat-change ${monthlyChangeValue >= 0 ? 'positive' : 'negative'}`;
-      changeEl.innerHTML = `<span>${monthlyChangeValue >= 0 ? '↑' : '↓'}</span><span>${monthlyChangeValue >= 0 ? '+' : ''}${formatCurrency(monthlyChangeValue)}</span>`;
+      const pct = h.length > 30 ? (change / h[h.length-30]?.corrected * 100) : 0;
+      document.getElementById('monthlyChangeSubtext').textContent = `${pct>=0?'+':''}${pct.toFixed(1)}%`;
+      
+      const ce = document.getElementById('netWorthChange');
+      ce.className = `stat-change ${change>=0?'positive':'negative'}`;
+      ce.innerHTML = `${change>=0?'↑':'↓'} ${formatCurrency(Math.abs(change))}`;
     }
     
     function renderChart() {
-      const history = processHistoryData();
-      if (!history.length) return;
+      const h = processHistory();
+      if (!h.length) return;
       
-      // Filter by range
-      let filteredHistory = history;
+      let data = h;
       if (chartRange !== 'all') {
-        const months = parseInt(chartRange);
-        const cutoffDate = new Date();
-        cutoffDate.setMonth(cutoffDate.getMonth() - months);
-        filteredHistory = history.filter(h => new Date(h.date) >= cutoffDate);
+        const mo = parseInt(chartRange);
+        const cut = new Date();
+        cut.setMonth(cut.getMonth() - mo);
+        data = h.filter(p => new Date(p.date) >= cut);
       }
       
       const ctx = document.getElementById('netWorthChart').getContext('2d');
+      if (netWorthChart) netWorthChart.destroy();
       
-      if (netWorthChart) {
-        netWorthChart.destroy();
-      }
+      const grad = ctx.createLinearGradient(0, 0, 0, 300);
+      grad.addColorStop(0, 'rgba(0,122,255,0.2)');
+      grad.addColorStop(1, 'rgba(0,122,255,0)');
       
       netWorthChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: filteredHistory.map(h => h.date),
-          datasets: [
-            {
-              label: 'Corrected Net Worth',
-              data: filteredHistory.map(h => h.corrected),
-              borderColor: '#E07A3A',
-              backgroundColor: 'rgba(224, 122, 58, 0.1)',
-              fill: true,
-              tension: 0.4,
-              pointRadius: 2,
-              pointHoverRadius: 6,
-              pointBackgroundColor: '#E07A3A',
-              pointHoverBackgroundColor: '#F5A623',
-            },
-            {
-              label: 'Wealthica Only',
-              data: filteredHistory.map(h => h.wealthica),
-              borderColor: '#4ECDC4',
-              backgroundColor: 'transparent',
-              borderDash: [5, 5],
-              tension: 0.4,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-            }
-          ]
+          labels: data.map(p => p.date),
+          datasets: [{
+            data: data.map(p => p.corrected),
+            borderColor: '#007AFF',
+            backgroundColor: grad,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            borderWidth: 2.5
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          interaction: {
-            intersect: false,
-            mode: 'index'
-          },
+          interaction: {intersect: false, mode: 'index'},
           plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                color: '#888',
-                usePointStyle: true,
-                padding: 20
-              }
-            },
+            legend: {display: false},
             tooltip: {
-              backgroundColor: '#1A1A1A',
-              titleColor: '#888',
-              bodyColor: '#F5F5F5',
-              borderColor: '#333',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              titleColor: '#000',
+              bodyColor: '#000',
+              borderColor: 'rgba(0,0,0,0.1)',
               borderWidth: 1,
-              titleFont: { family: "'JetBrains Mono', monospace" },
-              bodyFont: { family: "'JetBrains Mono', monospace" },
+              padding: 12,
+              cornerRadius: 10,
+              displayColors: false,
               callbacks: {
-                title: (ctx) => formatDate(ctx[0].label),
-                label: (ctx) => `${ctx.dataset.label}: ${formatFullCurrency(ctx.raw)}`
+                title: c => formatDate(c[0].label),
+                label: c => formatFull(c.raw)
               }
             }
           },
           scales: {
             x: {
-              grid: { color: '#252525' },
-              ticks: {
-                color: '#666',
-                maxTicksLimit: 12,
-                callback: function(val, index) {
-                  return formatDate(this.getLabelForValue(val));
-                }
-              }
+              grid: {display: false},
+              border: {display: false},
+              ticks: {color: 'rgba(0,0,0,0.4)', maxTicksLimit: 8, callback: function(v) { return formatDate(this.getLabelForValue(v)); }}
             },
             y: {
-              grid: { color: '#252525' },
-              ticks: {
-                color: '#666',
-                callback: (val) => formatCurrency(val)
-              }
+              grid: {color: 'rgba(0,0,0,0.04)'},
+              border: {display: false},
+              ticks: {color: 'rgba(0,0,0,0.4)', callback: v => formatCurrency(v)}
             }
           }
         }
@@ -1059,255 +712,121 @@
     }
     
     function renderAccounts() {
-      const institutions = wealthicaData.institutions || [];
-      const container = document.getElementById('accountsList');
+      const inst = wealthicaData.institutions || [];
+      const el = document.getElementById('accountsList');
+      const groups = {investment: [], cash: [], liability: []};
       
-      // Group accounts by type
-      const groups = {
-        investment: [],
-        cash: [],
-        liability: []
-      };
+      groups.investment.push({name: 'RPP - ClearPath 2065', inst: 'Canada Life', bal: currentRPP, manual: true});
       
-      // Add Canada Life RPP as manual account
-      groups.investment.push({
-        name: 'RPP - ClearPath 2065',
-        institution: 'Canada Life',
-        balance: currentRPP,
-        isManual: true
+      inst.forEach(i => {
+        const b = i.value || i.balance || i.cash || 0;
+        if (Math.abs(b) < 0.01) return;
+        const t = (i.type||i.category||'').toLowerCase();
+        const n = (i.name||'').toLowerCase();
+        const acc = {name: i.name||'Account', inst: i.provider_name||i.providerName||i.name||'', bal: b};
+        if (t.includes('credit')||t.includes('loan')||n.includes('visa')||n.includes('amex')||n.includes('credit')) groups.liability.push(acc);
+        else if (t.includes('chequing')||t.includes('checking')||t.includes('saving')||n.includes('chequing')||n.includes('savings')) groups.cash.push(acc);
+        else groups.investment.push(acc);
       });
       
-      // Wealthica returns institutions as a flat array - each institution has its own value
-      institutions.forEach(inst => {
-        const balance = inst.value || inst.balance || inst.cash || 0;
-        const type = (inst.type || inst.category || '').toLowerCase();
-        const name = (inst.name || '').toLowerCase();
-        const providerName = inst.provider_name || inst.providerName || inst.name || 'Unknown';
-        
-        const account = {
-          name: inst.name || 'Unknown Account',
-          institution: providerName,
-          balance: balance
-        };
-        
-        // Skip zero balance accounts to reduce clutter
-        if (Math.abs(balance) < 0.01) return;
-        
-        // Categorize based on type or name
-        if (type.includes('credit') || type.includes('loan') || type.includes('liability') || 
-            name.includes('visa') || name.includes('amex') || name.includes('credit line') ||
-            name.includes('credit card')) {
-          groups.liability.push(account);
-        } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving') ||
-                   type.includes('banking') || name.includes('chequing') || name.includes('savings')) {
-          groups.cash.push(account);
-        } else {
-          groups.investment.push(account);
-        }
-      });
-      
-      const colors = {
-        investment: '#E07A3A',
-        cash: '#4ECDC4',
-        liability: '#E74C3C'
-      };
-      
+      const colors = {investment: '#007AFF', cash: '#34C759', liability: '#FF3B30'};
       let html = '';
       
-      Object.entries(groups).forEach(([category, accounts]) => {
-        if (accounts.length === 0) return;
-        
-        const total = accounts.reduce((sum, a) => sum + a.balance, 0);
-        const expanded = expandedCategories[category];
-        
-        html += `
-          <div class="category-group">
-            <div class="category-header" onclick="toggleCategory('${category}')">
-              <div class="category-info">
-                <div class="category-dot" style="background:${colors[category]}"></div>
-                <span class="category-name">${category}</span>
-                <span class="category-total">${formatCurrency(total)}</span>
-              </div>
-              <span class="category-chevron ${expanded ? 'expanded' : ''}">▼</span>
+      Object.entries(groups).forEach(([cat, accs]) => {
+        if (!accs.length) return;
+        const tot = accs.reduce((s,a) => s + a.bal, 0);
+        const exp = expandedCategories[cat];
+        html += `<div class="account-group">
+          <div class="account-group-header" onclick="toggleCat('${cat}')">
+            <div class="account-group-info">
+              <div class="account-group-dot" style="background:${colors[cat]}"></div>
+              <span class="account-group-name">${cat}</span>
             </div>
-            ${expanded ? accounts.map(acc => `
-              <div class="account-row ${acc.isManual ? 'manual' : ''}">
-                <div class="account-info">
-                  <div class="account-icon" style="background:${colors[category]}20;color:${colors[category]}">${acc.name.charAt(0)}</div>
-                  <div class="account-details">
-                    <span class="account-name">${acc.name}</span>
-                    <span class="account-institution">${acc.institution}${acc.isManual ? ' • Manual' : ''}</span>
-                  </div>
-                </div>
-                <div class="account-balance" style="color:${category === 'liability' ? '#E74C3C' : '#E07A3A'}">
-                  ${category === 'liability' ? '-' : ''}${formatFullCurrency(Math.abs(acc.balance))}
-                </div>
-              </div>
-            `).join('') : ''}
+            <span class="account-group-total">${formatCurrency(tot)}</span>
           </div>
-        `;
+          ${exp ? accs.map(a => `
+            <div class="account-row ${a.manual?'manual':''}">
+              <div class="account-info">
+                <div class="account-icon" style="background:${colors[cat]}15;color:${colors[cat]}">${a.name[0].toUpperCase()}</div>
+                <div><div class="account-name">${a.name}</div><div class="account-institution">${a.inst}${a.manual?' • Manual':''}</div></div>
+              </div>
+              <span class="account-balance ${cat==='liability'?'negative':''}">${cat==='liability'?'-':''}${formatFull(Math.abs(a.bal))}</span>
+            </div>
+          `).join('') : ''}
+        </div>`;
       });
       
-      container.innerHTML = html || '<div class="loading"><span>No accounts found</span></div>';
+      el.innerHTML = html || '<div class="empty-state">No accounts</div>';
     }
     
     function renderHoldings() {
-      const positions = wealthicaData.positions || [];
-      const container = document.getElementById('holdingsList');
+      const pos = wealthicaData.positions || [];
+      const el = document.getElementById('holdingsList');
+      if (!pos.length) { el.innerHTML = '<div class="empty-state">No holdings</div>'; return; }
       
-      if (!positions.length) {
-        container.innerHTML = '<div class="loading"><span>No holdings found</span></div>';
-        return;
-      }
-      
-      // Sort by value
-      const sorted = [...positions].sort((a, b) => (b.value || 0) - (a.value || 0));
-      
-      const html = sorted.slice(0, 20).map(pos => {
-        const symbol = pos.security?.symbol || pos.symbol || 'N/A';
-        const name = pos.security?.name || pos.name || '';
-        const value = pos.value || (pos.quantity * (pos.security?.last_price || 0));
-        const quantity = pos.quantity || 0;
-        
-        return `
-          <div class="holding-row">
-            <div class="holding-info">
-              <span class="holding-symbol">${symbol}</span>
-              <span class="holding-name">${name}</span>
-            </div>
-            <div class="holding-value">
-              <div class="holding-amount">${formatFullCurrency(value)}</div>
-              <div class="holding-shares">${quantity.toFixed(2)} shares</div>
-            </div>
-          </div>
-        `;
+      const sorted = [...pos].sort((a,b) => (b.value||0) - (a.value||0));
+      el.innerHTML = sorted.slice(0,15).map(p => {
+        const sym = p.security?.symbol || p.symbol || '?';
+        const name = p.security?.name || p.name || '';
+        const val = p.value || 0;
+        const qty = p.quantity || 0;
+        return `<div class="holding-row">
+          <div><div class="holding-symbol">${sym}</div><div class="holding-name">${name.substring(0,25)}</div></div>
+          <div style="text-align:right"><div class="holding-amount">${formatFull(val)}</div><div class="holding-shares">${qty.toFixed(2)} units</div></div>
+        </div>`;
       }).join('');
-      
-      container.innerHTML = html;
     }
     
     function renderAllocation() {
-      const totals = calculateTotals();
+      const t = calcTotals();
       const ctx = document.getElementById('allocationChart').getContext('2d');
+      if (allocationChart) allocationChart.destroy();
       
       const data = [
-        { label: 'Investments', value: totals.investments + currentRPP, color: '#E07A3A' },
-        { label: 'Cash', value: totals.cash, color: '#4ECDC4' },
-        { label: 'Liabilities', value: totals.liabilities, color: '#E74C3C' }
+        {label: 'Investments', value: t.inv + currentRPP, color: '#007AFF'},
+        {label: 'Cash', value: t.cash, color: '#34C759'},
+        {label: 'Liabilities', value: t.liab, color: '#FF3B30'}
       ].filter(d => d.value > 0);
-      
-      if (allocationChart) {
-        allocationChart.destroy();
-      }
       
       allocationChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: data.map(d => d.label),
-          datasets: [{
-            data: data.map(d => d.value),
-            backgroundColor: data.map(d => d.color),
-            borderWidth: 0
-          }]
+          datasets: [{data: data.map(d => d.value), backgroundColor: data.map(d => d.color), borderWidth: 0}]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '65%',
+          cutout: '70%',
           plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: '#1A1A1A',
-              bodyColor: '#F5F5F5',
-              borderColor: '#333',
-              borderWidth: 1,
-              callbacks: {
-                label: (ctx) => `${ctx.label}: ${formatFullCurrency(ctx.raw)}`
-              }
-            }
+            legend: {position: 'right', labels: {color: 'rgba(0,0,0,0.6)', padding: 12, usePointStyle: true}},
+            tooltip: {callbacks: {label: c => `${c.label}: ${formatFull(c.raw)}`}}
           }
         }
       });
-      
-      // Legend
-      document.getElementById('allocationLegend').innerHTML = data.map(d => `
-        <div class="legend-item">
-          <div class="legend-dot" style="background:${d.color}"></div>
-          <span>${d.label}</span>
-        </div>
-      `).join('');
     }
     
-    function renderAnnotations() {
-      const container = document.getElementById('annotationsList');
-      const history = processHistoryData();
-      
-      // Find annotations that match history dates
-      const annotations = [];
-      Object.entries(ANNOTATIONS).forEach(([monthKey, note]) => {
-        const match = history.find(h => getMonthKey(h.date) === monthKey);
-        if (match) {
-          annotations.push({ date: monthKey, note, value: match.corrected });
-        }
-      });
-      
-      container.innerHTML = annotations.slice(-5).reverse().map(a => `
-        <div class="annotation-item">
-          <span class="annotation-date">${formatDate(a.date + '-01')}</span>
-          <span class="annotation-note">${a.note} • ${formatCurrency(a.value)}</span>
-        </div>
-      `).join('');
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // EVENT HANDLERS
-    // ═══════════════════════════════════════════════════════════════════
-    
-    function toggleCategory(category) {
-      expandedCategories[category] = !expandedCategories[category];
-      renderAccounts();
-    }
+    function toggleCat(c) { expandedCategories[c] = !expandedCategories[c]; renderAccounts(); }
+    window.toggleCat = toggleCat;
     
     function saveRPP() {
-      const input = document.getElementById('rppInput');
-      const value = parseFloat(input.value);
-      if (!isNaN(value) && value >= 0) {
-        currentRPP = value;
-        localStorage.setItem('wealthengine-rpp', value.toString());
-        renderAll();
-      }
+      const v = parseFloat(document.getElementById('rppInput').value);
+      if (!isNaN(v) && v >= 0) { currentRPP = v; localStorage.setItem('wealthengine-rpp', v); render(); }
     }
     
-    function setChartRange(range) {
-      chartRange = range;
-      document.querySelectorAll('.chart-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.range === range);
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('rppSave').onclick = saveRPP;
+      document.getElementById('rppInput').onkeypress = e => { if (e.key === 'Enter') saveRPP(); };
+      document.querySelectorAll('.chart-btn').forEach(b => {
+        b.onclick = () => {
+          chartRange = b.dataset.range;
+          document.querySelectorAll('.chart-btn').forEach(x => x.classList.remove('active'));
+          b.classList.add('active');
+          renderChart();
+        };
       });
-      renderChart();
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // INITIALIZATION
-    // ═══════════════════════════════════════════════════════════════════
-    
-    document.addEventListener('DOMContentLoaded', function() {
-      // RPP save button
-      document.getElementById('rppSave').addEventListener('click', saveRPP);
-      document.getElementById('rppInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') saveRPP();
-      });
-      
-      // Chart range buttons
-      document.querySelectorAll('.chart-btn').forEach(btn => {
-        btn.addEventListener('click', () => setChartRange(btn.dataset.range));
-      });
-      
-      // Initialize Wealthica
       initWealthica();
     });
-    
-    // Make toggleCategory global for onclick handlers
-    window.toggleCategory = toggleCategory;
   </script>
 </body>
 </html>
