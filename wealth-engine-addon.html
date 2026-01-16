@@ -818,11 +818,45 @@
         data = h.filter(p => new Date(p.date) >= cut);
       }
       
-      // Convert to Highcharts format [timestamp, value] - NO downsampling
-      // Wealthica renders all ~1700 points, we should too
-      const chartData = data.map(p => [new Date(p.date).getTime(), p.corrected]);
+      // DIAGNOSTIC: Check for duplicate dates and data quality
+      const dateMap = new Map();
+      data.forEach(p => {
+        const dateKey = p.date.split('T')[0]; // Get just the date part
+        if (!dateMap.has(dateKey)) {
+          dateMap.set(dateKey, []);
+        }
+        dateMap.get(dateKey).push(p);
+      });
       
-      log(`Chart: ${chartData.length} points`);
+      // Log data quality info
+      const duplicateDates = [...dateMap.entries()].filter(([k, v]) => v.length > 1);
+      log(`Data quality: ${data.length} raw points, ${dateMap.size} unique dates, ${duplicateDates.length} dates with multiple values`);
+      
+      if (duplicateDates.length > 0) {
+        log(`Sample duplicates: ${JSON.stringify(duplicateDates.slice(0, 3).map(([date, vals]) => ({
+          date,
+          count: vals.length,
+          values: vals.map(v => v.corrected.toFixed(0))
+        })))}`);
+      }
+      
+      // DEDUPLICATE: Keep only ONE value per day (the last one for that day)
+      const deduped = [];
+      const seenDates = new Set();
+      
+      // Process in reverse to keep the LAST entry for each date
+      for (let i = data.length - 1; i >= 0; i--) {
+        const dateKey = data[i].date.split('T')[0];
+        if (!seenDates.has(dateKey)) {
+          seenDates.add(dateKey);
+          deduped.unshift(data[i]); // Add to front to maintain order
+        }
+      }
+      
+      log(`After dedup: ${deduped.length} points (removed ${data.length - deduped.length} duplicates)`);
+      
+      // Convert to Highcharts format [timestamp, value]
+      const chartData = deduped.map(p => [new Date(p.date).getTime(), p.corrected]);
       
       if (netWorthChart) {
         netWorthChart.destroy();
@@ -906,8 +940,6 @@
           areaspline: {
             lineWidth: 2,
             lineColor: '#0078ff',
-            linecap: 'round',
-            lineJoin: 'round',
             fillColor: {
               linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
               stops: [
@@ -933,8 +965,7 @@
               }
             },
             threshold: null,
-            turboThreshold: 0,
-            connectNulls: true
+            turboThreshold: 0
           }
         },
         series: [{
