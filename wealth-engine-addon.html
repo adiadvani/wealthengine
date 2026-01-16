@@ -803,75 +803,6 @@
       ce.innerHTML = `${change>=0?'↑':'↓'} ${formatCurrency(Math.abs(change))}`;
     }
     
-    // LTTB (Largest Triangle Three Buckets) downsampling algorithm
-    // This is what financial charts use - it preserves visual shape while reducing points
-    function downsampleLTTB(data, threshold) {
-      if (data.length <= threshold) return data;
-      
-      const sampled = [];
-      const bucketSize = (data.length - 2) / (threshold - 2);
-      
-      // Always keep first point
-      sampled.push(data[0]);
-      
-      let a = 0; // Previous selected point index
-      
-      for (let i = 0; i < threshold - 2; i++) {
-        // Calculate bucket range
-        const bucketStart = Math.floor((i + 1) * bucketSize) + 1;
-        const bucketEnd = Math.floor((i + 2) * bucketSize) + 1;
-        const bucketEndClamped = Math.min(bucketEnd, data.length - 1);
-        
-        // Calculate average point of next bucket (for area calculation)
-        let avgX = 0, avgY = 0;
-        const nextBucketStart = Math.floor((i + 2) * bucketSize) + 1;
-        const nextBucketEnd = Math.min(Math.floor((i + 3) * bucketSize) + 1, data.length);
-        const nextBucketSize = nextBucketEnd - nextBucketStart;
-        
-        if (nextBucketSize > 0) {
-          for (let j = nextBucketStart; j < nextBucketEnd; j++) {
-            avgX += new Date(data[j].date).getTime();
-            avgY += data[j].corrected;
-          }
-          avgX /= nextBucketSize;
-          avgY /= nextBucketSize;
-        } else {
-          avgX = new Date(data[data.length - 1].date).getTime();
-          avgY = data[data.length - 1].corrected;
-        }
-        
-        // Find point in current bucket with largest triangle area
-        let maxArea = -1;
-        let maxIndex = bucketStart;
-        const pointAX = new Date(data[a].date).getTime();
-        const pointAY = data[a].corrected;
-        
-        for (let j = bucketStart; j < bucketEndClamped; j++) {
-          const pointX = new Date(data[j].date).getTime();
-          const pointY = data[j].corrected;
-          
-          // Triangle area calculation
-          const area = Math.abs(
-            (pointAX - avgX) * (pointY - pointAY) -
-            (pointAX - pointX) * (avgY - pointAY)
-          ) * 0.5;
-          
-          if (area > maxArea) {
-            maxArea = area;
-            maxIndex = j;
-          }
-        }
-        
-        sampled.push(data[maxIndex]);
-        a = maxIndex;
-      }
-      
-      // Always keep last point
-      sampled.push(data[data.length - 1]);
-      
-      return sampled;
-    }
-    
     function renderChart() {
       const h = processHistory();
       if (!h.length) {
@@ -887,13 +818,11 @@
         data = h.filter(p => new Date(p.date) >= cut);
       }
       
-      // Use LTTB algorithm - much more aggressive downsampling
-      // Target: ~100-150 points regardless of time range
-      const targetPoints = chartRange === 'all' ? 150 : 100;
-      const chartData = downsampleLTTB(data, targetPoints)
-        .map(p => [new Date(p.date).getTime(), p.corrected]);
+      // Convert to Highcharts format [timestamp, value] - NO downsampling
+      // Wealthica renders all ~1700 points, we should too
+      const chartData = data.map(p => [new Date(p.date).getTime(), p.corrected]);
       
-      log(`Chart: ${data.length} raw -> ${chartData.length} rendered (target: ${targetPoints})`);
+      log(`Chart: ${chartData.length} points`);
       
       if (netWorthChart) {
         netWorthChart.destroy();
@@ -907,7 +836,8 @@
           style: {
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
           },
-          spacing: [10, 0, 10, 0]
+          spacing: [10, 0, 10, 0],
+          animation: false
         },
         title: {
           text: null
@@ -976,6 +906,8 @@
           areaspline: {
             lineWidth: 2,
             lineColor: '#0078ff',
+            linecap: 'round',
+            lineJoin: 'round',
             fillColor: {
               linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
               stops: [
@@ -1000,12 +932,15 @@
                 lineWidth: 2
               }
             },
-            threshold: null
+            threshold: null,
+            turboThreshold: 0,
+            connectNulls: true
           }
         },
         series: [{
           name: 'Net Worth',
-          data: chartData
+          data: chartData,
+          animation: false
         }]
       });
     }
