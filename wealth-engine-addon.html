@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wealth Engine</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://code.highcharts.com/9.1.2/highcharts.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
@@ -259,6 +260,11 @@
     
     .chart-container {
       height: 320px;
+    }
+    
+    .chart-container > div {
+      width: 100%;
+      height: 100%;
     }
     
     .main-grid {
@@ -542,7 +548,7 @@
         </div>
       </div>
       <div class="chart-container">
-        <canvas id="netWorthChart"></canvas>
+        <div id="netWorthChart"></div>
       </div>
     </div>
     
@@ -797,49 +803,6 @@
       ce.innerHTML = `${change>=0?'↑':'↓'} ${formatCurrency(Math.abs(change))}`;
     }
     
-    // Downsample data to target number of points for smooth chart rendering
-    function downsampleData(data, targetPoints) {
-      if (data.length <= targetPoints) return data;
-      
-      const result = [];
-      const step = (data.length - 1) / (targetPoints - 1);
-      
-      for (let i = 0; i < targetPoints; i++) {
-        const idx = Math.round(i * step);
-        result.push(data[idx]);
-      }
-      
-      // Always include the last point for accuracy
-      if (result[result.length - 1] !== data[data.length - 1]) {
-        result[result.length - 1] = data[data.length - 1];
-      }
-      
-      return result;
-    }
-    
-    // Aggregate to weekly data points (every 7 days, taking the last value of each week)
-    function aggregateWeekly(data) {
-      if (data.length <= 100) return data;
-      
-      const result = [];
-      let weekStart = null;
-      let lastPoint = null;
-      
-      data.forEach(p => {
-        const date = new Date(p.date);
-        const weekNum = Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
-        
-        if (weekStart !== weekNum) {
-          if (lastPoint) result.push(lastPoint);
-          weekStart = weekNum;
-        }
-        lastPoint = p;
-      });
-      
-      if (lastPoint) result.push(lastPoint);
-      return result;
-    }
-    
     function renderChart() {
       const h = processHistory();
       if (!h.length) return;
@@ -852,86 +815,122 @@
         data = h.filter(p => new Date(p.date) >= cut);
       }
       
-      // Downsample for smooth rendering
-      // For "all" view with lots of data, use weekly aggregation
-      // For shorter ranges, use simple downsampling to ~150 points max
-      let chartData;
-      if (chartRange === 'all' && data.length > 200) {
-        chartData = aggregateWeekly(data);
-      } else if (data.length > 150) {
-        chartData = downsampleData(data, 150);
-      } else {
-        chartData = data;
+      // Convert to Highcharts format [timestamp, value]
+      const chartData = data.map(p => [new Date(p.date).getTime(), p.corrected]);
+      
+      log(`Chart: ${chartData.length} points`);
+      
+      if (netWorthChart) {
+        netWorthChart.destroy();
       }
       
-      log(`Chart: ${data.length} points -> ${chartData.length} displayed`);
-      
-      const ctx = document.getElementById('netWorthChart').getContext('2d');
-      if (netWorthChart) netWorthChart.destroy();
-      
-      // Subtle gradient fill - very light
-      const grad = ctx.createLinearGradient(0, 0, 0, 320);
-      grad.addColorStop(0, 'rgba(0,122,255,0.08)');
-      grad.addColorStop(1, 'rgba(0,122,255,0)');
-      
-      netWorthChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: chartData.map(p => p.date),
-          datasets: [{
-            data: chartData.map(p => p.corrected),
-            borderColor: '#007AFF',
-            backgroundColor: grad,
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            pointHoverRadius: 5,
-            pointHoverBackgroundColor: '#007AFF',
-            pointHoverBorderColor: '#fff',
-            pointHoverBorderWidth: 2,
-            borderWidth: 2,
-            borderJoinStyle: 'round',
-            borderCapStyle: 'round'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {intersect: false, mode: 'index'},
-          plugins: {
-            legend: {display: false},
-            tooltip: {
-              backgroundColor: 'rgba(255,255,255,0.95)',
-              titleColor: '#000',
-              bodyColor: '#000',
-              borderColor: 'rgba(0,0,0,0.1)',
-              borderWidth: 1,
-              padding: 12,
-              cornerRadius: 10,
-              displayColors: false,
-              callbacks: {
-                title: c => formatDate(c[0].label),
-                label: c => formatFull(c.raw)
-              }
-            }
+      netWorthChart = Highcharts.chart('netWorthChart', {
+        chart: {
+          type: 'areaspline',
+          height: 320,
+          backgroundColor: 'transparent',
+          style: {
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
           },
-          scales: {
-            x: {
-              grid: {display: false},
-              border: {display: false},
-              ticks: {
-                color: 'rgba(0,0,0,0.4)', 
-                maxTicksLimit: 8, 
-                callback: function(v) { return formatDate(this.getLabelForValue(v)); }
-              }
+          spacing: [10, 0, 10, 0]
+        },
+        title: {
+          text: null
+        },
+        credits: {
+          enabled: false
+        },
+        legend: {
+          enabled: false
+        },
+        xAxis: {
+          type: 'datetime',
+          lineColor: 'transparent',
+          tickColor: 'transparent',
+          labels: {
+            style: {
+              color: 'rgba(0,0,0,0.4)',
+              fontSize: '11px'
             },
-            y: {
-              grid: {color: 'rgba(0,0,0,0.04)'},
-              border: {display: false},
-              ticks: {color: 'rgba(0,0,0,0.4)', callback: v => formatCurrency(v)}
+            format: '{value:%b \'%y}'
+          },
+          crosshair: {
+            color: 'rgba(0,122,255,0.2)',
+            width: 1
+          }
+        },
+        yAxis: {
+          title: {
+            text: null
+          },
+          gridLineColor: 'rgba(0,0,0,0.04)',
+          labels: {
+            style: {
+              color: 'rgba(0,0,0,0.4)',
+              fontSize: '11px'
+            },
+            formatter: function() {
+              return formatCurrency(this.value);
             }
           }
-        }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          borderColor: 'rgba(0,0,0,0.1)',
+          borderRadius: 10,
+          shadow: {
+            color: 'rgba(0,0,0,0.08)',
+            offsetX: 0,
+            offsetY: 4,
+            width: 16
+          },
+          style: {
+            color: '#000',
+            fontSize: '13px'
+          },
+          formatter: function() {
+            return '<span style="font-size:12px;color:rgba(0,0,0,0.5)">' + 
+              Highcharts.dateFormat('%b %e, %Y', this.x) + '</span><br/>' +
+              '<span style="font-size:15px;font-weight:600">' + formatFull(this.y) + '</span>';
+          },
+          useHTML: true
+        },
+        plotOptions: {
+          areaspline: {
+            lineWidth: 2,
+            lineColor: '#007AFF',
+            fillColor: {
+              linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+              stops: [
+                [0, 'rgba(0,122,255,0.12)'],
+                [1, 'rgba(0,122,255,0)']
+              ]
+            },
+            marker: {
+              enabled: false,
+              states: {
+                hover: {
+                  enabled: true,
+                  radius: 5,
+                  fillColor: '#007AFF',
+                  lineColor: '#fff',
+                  lineWidth: 2
+                }
+              }
+            },
+            states: {
+              hover: {
+                lineWidth: 2
+              }
+            },
+            threshold: null
+          }
+        },
+        series: [{
+          name: 'Net Worth',
+          data: chartData,
+          turboThreshold: 5000
+        }]
       });
     }
     
