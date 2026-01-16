@@ -662,7 +662,7 @@
   </div>
 
   <!-- Wealthica Add-on SDK -->
-  <script src="https://cdn.jsdelivr.net/gh/wealthica/wealthica.js@master/dist/addon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@wealthica/wealthica.js@1.0.11/dist/addon.min.js"></script>
   
   <script>
     // ═══════════════════════════════════════════════════════════════════
@@ -776,7 +776,7 @@
     // ═══════════════════════════════════════════════════════════════════
     
     function initWealthica() {
-      addon = new Wealthica.Addon();
+      addon = new Addon();
       
       addon.on('init', function(options) {
         console.log('Wealthica initialized:', options);
