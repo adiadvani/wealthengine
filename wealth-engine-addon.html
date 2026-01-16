@@ -803,30 +803,81 @@
       ce.innerHTML = `${change>=0?'↑':'↓'} ${formatCurrency(Math.abs(change))}`;
     }
     
-    // Aggregate data to reduce point density - take one point per period
-    function aggregateData(data, targetPoints) {
-      if (data.length <= targetPoints) return data;
+    // LTTB (Largest Triangle Three Buckets) downsampling algorithm
+    // This is what financial charts use - it preserves visual shape while reducing points
+    function downsampleLTTB(data, threshold) {
+      if (data.length <= threshold) return data;
       
-      const result = [];
-      const step = Math.ceil(data.length / targetPoints);
+      const sampled = [];
+      const bucketSize = (data.length - 2) / (threshold - 2);
       
-      for (let i = 0; i < data.length; i += step) {
-        // Take the last point in each chunk (most recent value for that period)
-        const chunkEnd = Math.min(i + step - 1, data.length - 1);
-        result.push(data[chunkEnd]);
+      // Always keep first point
+      sampled.push(data[0]);
+      
+      let a = 0; // Previous selected point index
+      
+      for (let i = 0; i < threshold - 2; i++) {
+        // Calculate bucket range
+        const bucketStart = Math.floor((i + 1) * bucketSize) + 1;
+        const bucketEnd = Math.floor((i + 2) * bucketSize) + 1;
+        const bucketEndClamped = Math.min(bucketEnd, data.length - 1);
+        
+        // Calculate average point of next bucket (for area calculation)
+        let avgX = 0, avgY = 0;
+        const nextBucketStart = Math.floor((i + 2) * bucketSize) + 1;
+        const nextBucketEnd = Math.min(Math.floor((i + 3) * bucketSize) + 1, data.length);
+        const nextBucketSize = nextBucketEnd - nextBucketStart;
+        
+        if (nextBucketSize > 0) {
+          for (let j = nextBucketStart; j < nextBucketEnd; j++) {
+            avgX += new Date(data[j].date).getTime();
+            avgY += data[j].corrected;
+          }
+          avgX /= nextBucketSize;
+          avgY /= nextBucketSize;
+        } else {
+          avgX = new Date(data[data.length - 1].date).getTime();
+          avgY = data[data.length - 1].corrected;
+        }
+        
+        // Find point in current bucket with largest triangle area
+        let maxArea = -1;
+        let maxIndex = bucketStart;
+        const pointAX = new Date(data[a].date).getTime();
+        const pointAY = data[a].corrected;
+        
+        for (let j = bucketStart; j < bucketEndClamped; j++) {
+          const pointX = new Date(data[j].date).getTime();
+          const pointY = data[j].corrected;
+          
+          // Triangle area calculation
+          const area = Math.abs(
+            (pointAX - avgX) * (pointY - pointAY) -
+            (pointAX - pointX) * (avgY - pointAY)
+          ) * 0.5;
+          
+          if (area > maxArea) {
+            maxArea = area;
+            maxIndex = j;
+          }
+        }
+        
+        sampled.push(data[maxIndex]);
+        a = maxIndex;
       }
       
-      // Always ensure we have the very last data point
-      if (result[result.length - 1] !== data[data.length - 1]) {
-        result.push(data[data.length - 1]);
-      }
+      // Always keep last point
+      sampled.push(data[data.length - 1]);
       
-      return result;
+      return sampled;
     }
     
     function renderChart() {
       const h = processHistory();
-      if (!h.length) return;
+      if (!h.length) {
+        log('No history data');
+        return;
+      }
       
       let data = h;
       if (chartRange !== 'all') {
@@ -836,21 +887,13 @@
         data = h.filter(p => new Date(p.date) >= cut);
       }
       
-      // Determine target points based on range
-      // More points for shorter ranges, fewer for longer ranges
-      let targetPoints;
-      if (chartRange === '6') targetPoints = 90;      // ~every 2 days
-      else if (chartRange === '12') targetPoints = 120; // ~every 3 days  
-      else if (chartRange === '24') targetPoints = 150; // ~every 5 days
-      else targetPoints = 200;                          // ~weekly for all-time
+      // Use LTTB algorithm - much more aggressive downsampling
+      // Target: ~100-150 points regardless of time range
+      const targetPoints = chartRange === 'all' ? 150 : 100;
+      const chartData = downsampleLTTB(data, targetPoints)
+        .map(p => [new Date(p.date).getTime(), p.corrected]);
       
-      // Aggregate data to reduce density
-      const aggregatedData = aggregateData(data, targetPoints);
-      
-      // Convert to Highcharts format [timestamp, value]
-      const chartData = aggregatedData.map(p => [new Date(p.date).getTime(), p.corrected]);
-      
-      log(`Chart: ${data.length} raw -> ${chartData.length} rendered`);
+      log(`Chart: ${data.length} raw -> ${chartData.length} rendered (target: ${targetPoints})`);
       
       if (netWorthChart) {
         netWorthChart.destroy();
