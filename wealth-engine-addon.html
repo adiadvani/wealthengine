@@ -798,27 +798,49 @@
     async function loadAllData() {
       try {
         updateStatus('Syncing data...', false);
+        console.log('Starting data load...');
         
-        // Load history using addon.api helper
-        const historyResponse = await addon.api.getHistory({
-          from: '2021-04-01',
-          to: new Date().toISOString().split('T')[0]
-        });
-        wealthicaData.history = historyResponse || [];
-        console.log('History loaded:', wealthicaData.history.length, 'points');
+        // Load history using addon.request
+        try {
+          const historyResponse = await addon.request({
+            method: 'GET',
+            endpoint: 'history',
+            query: {
+              from: '2021-04-01',
+              to: new Date().toISOString().split('T')[0]
+            }
+          });
+          wealthicaData.history = historyResponse || [];
+          console.log('History loaded:', wealthicaData.history.length, 'points');
+        } catch (e) {
+          console.error('History error:', e);
+        }
         
-        // Load positions using addon.api helper
-        const positionsResponse = await addon.api.getPositions({
-          assets: true
-        });
-        wealthicaData.positions = positionsResponse || [];
-        console.log('Positions loaded:', wealthicaData.positions.length);
+        // Load positions
+        try {
+          const positionsResponse = await addon.request({
+            method: 'GET',
+            endpoint: 'positions',
+            query: { assets: true }
+          });
+          wealthicaData.positions = positionsResponse || [];
+          console.log('Positions loaded:', wealthicaData.positions.length);
+        } catch (e) {
+          console.error('Positions error:', e);
+        }
         
-        // Load institutions using addon.api helper
-        const institutionsResponse = await addon.api.getInstitutions();
-        wealthicaData.institutions = institutionsResponse || [];
-        console.log('Institutions loaded:', wealthicaData.institutions.length);
-        console.log('Institutions data:', JSON.stringify(wealthicaData.institutions, null, 2));
+        // Load institutions
+        try {
+          const institutionsResponse = await addon.request({
+            method: 'GET',
+            endpoint: 'institutions'
+          });
+          wealthicaData.institutions = institutionsResponse || [];
+          console.log('Institutions loaded:', wealthicaData.institutions.length);
+          console.log('First institution:', wealthicaData.institutions[0]);
+        } catch (e) {
+          console.error('Institutions error:', e);
+        }
         
         updateStatus('Live • Synced', false);
         renderAll();
