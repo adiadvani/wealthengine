@@ -799,31 +799,26 @@
       try {
         updateStatus('Syncing data...', false);
         
-        // Load history
-        const historyResponse = await addon.request({
-          method: 'GET',
-          endpoint: 'history',
-          query: {
-            from: '2021-04-01',
-            to: new Date().toISOString().split('T')[0]
-          }
+        // Load history using addon.api helper
+        const historyResponse = await addon.api.getHistory({
+          from: '2021-04-01',
+          to: new Date().toISOString().split('T')[0]
         });
         wealthicaData.history = historyResponse || [];
+        console.log('History loaded:', wealthicaData.history.length, 'points');
         
-        // Load positions
-        const positionsResponse = await addon.request({
-          method: 'GET',
-          endpoint: 'positions',
-          query: { assets: true }
+        // Load positions using addon.api helper
+        const positionsResponse = await addon.api.getPositions({
+          assets: true
         });
         wealthicaData.positions = positionsResponse || [];
+        console.log('Positions loaded:', wealthicaData.positions.length);
         
-        // Load institutions (accounts)
-        const institutionsResponse = await addon.request({
-          method: 'GET',
-          endpoint: 'institutions'
-        });
+        // Load institutions using addon.api helper
+        const institutionsResponse = await addon.api.getInstitutions();
         wealthicaData.institutions = institutionsResponse || [];
+        console.log('Institutions loaded:', wealthicaData.institutions.length);
+        console.log('Institutions data:', JSON.stringify(wealthicaData.institutions, null, 2));
         
         updateStatus('Live • Synced', false);
         renderAll();
@@ -845,7 +840,8 @@
       // Convert to corrected values (add RPP)
       return history.map(point => {
         const date = point.date || point.d;
-        const wealthicaValue = point.value || point.v || 0;
+        // Wealthica returns 'value' or 'networth' depending on endpoint
+        const wealthicaValue = point.value || point.networth || point.v || 0;
         const rppValue = getRPPForDate(date);
         return {
           date: date,
@@ -857,25 +853,28 @@
     }
     
     function calculateTotals() {
+      // Wealthica institutions array - each item IS an institution with its own value
       const institutions = wealthicaData.institutions || [];
       let investments = 0;
       let cash = 0;
       let liabilities = 0;
       
       institutions.forEach(inst => {
-        const accounts = inst.accounts || [];
-        accounts.forEach(acc => {
-          const balance = acc.balance || acc.value || 0;
-          const type = (acc.type || '').toLowerCase();
-          
-          if (type.includes('credit') || type.includes('loan') || type.includes('liability')) {
-            liabilities += Math.abs(balance);
-          } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving')) {
-            cash += balance;
-          } else {
-            investments += balance;
-          }
-        });
+        // The balance is directly on the institution object
+        const balance = inst.value || inst.balance || inst.cash || 0;
+        const type = (inst.type || inst.category || '').toLowerCase();
+        const name = (inst.name || '').toLowerCase();
+        
+        // Categorize based on type or name
+        if (type.includes('credit') || type.includes('loan') || type.includes('liability') || 
+            name.includes('visa') || name.includes('amex') || name.includes('credit')) {
+          liabilities += Math.abs(balance);
+        } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving') ||
+                   type.includes('banking') || name.includes('chequing') || name.includes('saving')) {
+          cash += Math.abs(balance);
+        } else {
+          investments += balance;
+        }
       });
       
       wealthicaData.totals = { investments, cash, liabilities };
@@ -1056,25 +1055,33 @@
         isManual: true
       });
       
+      // Wealthica returns institutions as a flat array - each institution has its own value
       institutions.forEach(inst => {
-        const accounts = inst.accounts || [];
-        accounts.forEach(acc => {
-          const balance = acc.balance || acc.value || 0;
-          const type = (acc.type || '').toLowerCase();
-          const account = {
-            name: acc.name || 'Unknown',
-            institution: inst.name || 'Unknown',
-            balance: balance
-          };
-          
-          if (type.includes('credit') || type.includes('loan') || type.includes('liability')) {
-            groups.liability.push(account);
-          } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving')) {
-            groups.cash.push(account);
-          } else {
-            groups.investment.push(account);
-          }
-        });
+        const balance = inst.value || inst.balance || inst.cash || 0;
+        const type = (inst.type || inst.category || '').toLowerCase();
+        const name = (inst.name || '').toLowerCase();
+        const providerName = inst.provider_name || inst.providerName || inst.name || 'Unknown';
+        
+        const account = {
+          name: inst.name || 'Unknown Account',
+          institution: providerName,
+          balance: balance
+        };
+        
+        // Skip zero balance accounts to reduce clutter
+        if (Math.abs(balance) < 0.01) return;
+        
+        // Categorize based on type or name
+        if (type.includes('credit') || type.includes('loan') || type.includes('liability') || 
+            name.includes('visa') || name.includes('amex') || name.includes('credit line') ||
+            name.includes('credit card')) {
+          groups.liability.push(account);
+        } else if (type.includes('chequing') || type.includes('checking') || type.includes('saving') ||
+                   type.includes('banking') || name.includes('chequing') || name.includes('savings')) {
+          groups.cash.push(account);
+        } else {
+          groups.investment.push(account);
+        }
       });
       
       const colors = {
