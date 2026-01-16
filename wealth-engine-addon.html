@@ -279,16 +279,22 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-height: 400px;
+      max-height: 500px;
       overflow-y: auto;
     }
     
     .holding-row {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 16px;
+      align-items: center;
       padding: 14px 16px;
       background: rgba(0, 0, 0, 0.02);
       border-radius: 12px;
+    }
+    
+    .holding-info {
+      min-width: 0;
     }
     
     .holding-symbol {
@@ -300,16 +306,54 @@
     .holding-name {
       font-size: 12px;
       color: var(--text-tertiary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
-    .holding-amount {
-      font-size: 15px;
+    .holding-col {
+      text-align: right;
+      min-width: 80px;
+    }
+    
+    .holding-col-label {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+    }
+    
+    .holding-col-value {
+      font-size: 14px;
       font-weight: 600;
     }
     
-    .holding-shares {
-      font-size: 12px;
+    .holding-col-sub {
+      font-size: 11px;
       color: var(--text-tertiary);
+    }
+    
+    .gain-positive { color: var(--green); }
+    .gain-negative { color: var(--red); }
+    
+    .holdings-header {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 16px;
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      margin-bottom: 8px;
+    }
+    
+    .holdings-header span:not(:first-child) {
+      text-align: right;
+      min-width: 80px;
     }
     
     .account-group { margin-bottom: 16px; }
@@ -411,6 +455,38 @@
       text-align: center;
       color: var(--text-tertiary);
     }
+    
+    .debug-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    
+    .debug-panel {
+      position: fixed;
+      bottom: 60px;
+      right: 20px;
+      width: 400px;
+      max-height: 300px;
+      overflow: auto;
+      background: rgba(0,0,0,0.9);
+      color: #0f0;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      display: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
@@ -475,6 +551,12 @@
         <div class="section-header">
           <h2 class="section-title">Holdings</h2>
         </div>
+        <div class="holdings-header">
+          <span>Symbol</span>
+          <span>Shares</span>
+          <span>Avg Cost</span>
+          <span>Value / Gain</span>
+        </div>
         <div id="holdingsList" class="holdings-list">
           <div class="empty-state">Loading...</div>
         </div>
@@ -495,6 +577,9 @@
     </div>
   </div>
 
+  <button class="debug-toggle" onclick="toggleDebug()">Debug</button>
+  <div id="debugPanel" class="debug-panel"></div>
+
   <script src="https://wealthica.github.io/wealthica.js/dist/addon.min.js"></script>
   <script>
     const CANADA_LIFE_HISTORY = {
@@ -505,16 +590,43 @@
       "2025-01": 15500, "2025-02": 17500, "2025-03": 18500, "2025-04": 19500,
       "2025-05": 21000, "2025-06": 22500, "2025-07": 24000, "2025-08": 25500,
       "2025-09": 26500, "2025-10": 27500, "2025-11": 28981.63, "2025-12": 30000,
-      "2026-01": 28981.63
+      "2026-01": 32000
     };
     
+    // Liability keywords - comprehensive list
+    const LIABILITY_KEYWORDS = [
+      'credit', 'visa', 'mastercard', 'amex', 'american express',
+      'line of credit', 'loc', 'loan', 'mortgage', 'debt',
+      'avion', 'cashback', 'rewards', 'infinite', 'platinum',
+      'rbc visa', 'td visa', 'bmo', 'cibc', 'scotia'
+    ];
+    
+    // Cash account keywords
+    const CASH_KEYWORDS = [
+      'chequing', 'checking', 'savings', 'saving', 'high interest',
+      'daily interest', 'esavings', 'e-savings'
+    ];
+    
     let addon = null;
-    let currentRPP = parseFloat(localStorage.getItem('wealthengine-rpp')) || 28981.63;
+    let currentRPP = parseFloat(localStorage.getItem('wealthengine-rpp')) || 32000;
     let wealthicaData = { history: [], positions: [], institutions: [] };
     let netWorthChart = null;
     let allocationChart = null;
     let chartRange = 'all';
     let expandedCategories = { investment: true, cash: true, liability: true };
+    let debugMode = false;
+    
+    function log(msg, data) {
+      const panel = document.getElementById('debugPanel');
+      const entry = `[${new Date().toLocaleTimeString()}] ${msg}${data ? '\n' + JSON.stringify(data, null, 2) : ''}\n`;
+      panel.textContent = entry + panel.textContent;
+      console.log(msg, data);
+    }
+    
+    function toggleDebug() {
+      debugMode = !debugMode;
+      document.getElementById('debugPanel').style.display = debugMode ? 'block' : 'none';
+    }
     
     function formatCurrency(n) {
       if (n == null || isNaN(n)) return '--';
@@ -550,26 +662,67 @@
       return val;
     }
     
+    // Improved account classification
+    function classifyAccount(account) {
+      const name = (account.name || '').toLowerCase();
+      const type = (account.type || account.category || '').toLowerCase();
+      const balance = account.value || account.balance || account.cash || 0;
+      
+      // Check for liabilities first (most specific)
+      for (const kw of LIABILITY_KEYWORDS) {
+        if (name.includes(kw) || type.includes(kw)) {
+          return 'liability';
+        }
+      }
+      
+      // Check if balance is negative (likely a liability)
+      if (balance < 0) {
+        return 'liability';
+      }
+      
+      // Check for cash accounts
+      for (const kw of CASH_KEYWORDS) {
+        if (name.includes(kw) || type.includes(kw)) {
+          return 'cash';
+        }
+      }
+      
+      // Default to investment
+      return 'investment';
+    }
+    
     function initWealthica() {
       addon = new Addon();
-      addon.on('init', () => { updateStatus('Live'); loadData(); });
+      addon.on('init', (data) => { 
+        log('Addon initialized', data);
+        updateStatus('Live'); 
+        loadData(); 
+      });
       addon.on('reload', loadData);
-      addon.on('update', o => console.log('Update:', o));
+      addon.on('update', o => log('Update:', o));
     }
     
     async function loadData() {
       updateStatus('Syncing...');
       try {
         const [hist, pos, inst] = await Promise.all([
-          addon.request({method:'GET', endpoint:'history', query:{from:'2021-04-01', to:new Date().toISOString().split('T')[0]}}).catch(()=>[]),
-          addon.request({method:'GET', endpoint:'positions', query:{assets:true}}).catch(()=>[]),
-          addon.request({method:'GET', endpoint:'institutions'}).catch(()=>[])
+          addon.request({method:'GET', endpoint:'history', query:{from:'2021-04-01', to:new Date().toISOString().split('T')[0]}}).catch(e => { log('History error', e); return []; }),
+          addon.request({method:'GET', endpoint:'positions', query:{institutions:'', assets:true, groups:'', investments:''}}).catch(e => { log('Positions error', e); return []; }),
+          addon.request({method:'GET', endpoint:'institutions'}).catch(e => { log('Institutions error', e); return []; })
         ]);
+        
         wealthicaData = {history: hist||[], positions: pos||[], institutions: inst||[]};
-        console.log('Data:', wealthicaData.history.length, 'hist,', wealthicaData.positions.length, 'pos,', wealthicaData.institutions.length, 'inst');
+        
+        log('History loaded', { count: wealthicaData.history.length, sample: wealthicaData.history.slice(0,2) });
+        log('Positions loaded', { count: wealthicaData.positions.length, sample: wealthicaData.positions.slice(0,3) });
+        log('Institutions loaded', { count: wealthicaData.institutions.length, data: wealthicaData.institutions });
+        
         updateStatus('Live');
         render();
-      } catch(e) { console.error(e); updateStatus('Error'); }
+      } catch(e) { 
+        log('Load error', e); 
+        updateStatus('Error'); 
+      }
     }
     
     function updateStatus(t) {
@@ -593,11 +746,15 @@
       let inv=0, cash=0, liab=0;
       (wealthicaData.institutions||[]).forEach(i => {
         const b = i.value || i.balance || i.cash || 0;
-        const t = (i.type||i.category||'').toLowerCase();
-        const n = (i.name||'').toLowerCase();
-        if (t.includes('credit')||t.includes('loan')||n.includes('visa')||n.includes('amex')||n.includes('credit')) liab += Math.abs(b);
-        else if (t.includes('chequing')||t.includes('checking')||t.includes('saving')||n.includes('chequing')||n.includes('savings')) cash += Math.abs(b);
-        else inv += b;
+        const category = classifyAccount(i);
+        
+        if (category === 'liability') {
+          liab += Math.abs(b);
+        } else if (category === 'cash') {
+          cash += Math.abs(b);
+        } else {
+          inv += b;
+        }
       });
       return {inv, cash, liab};
     }
@@ -655,8 +812,10 @@
       const ctx = document.getElementById('netWorthChart').getContext('2d');
       if (netWorthChart) netWorthChart.destroy();
       
-      const grad = ctx.createLinearGradient(0, 0, 0, 300);
-      grad.addColorStop(0, 'rgba(0,122,255,0.2)');
+      // Subtle gradient fill
+      const grad = ctx.createLinearGradient(0, 0, 0, 320);
+      grad.addColorStop(0, 'rgba(0,122,255,0.15)');
+      grad.addColorStop(0.5, 'rgba(0,122,255,0.05)');
       grad.addColorStop(1, 'rgba(0,122,255,0)');
       
       netWorthChart = new Chart(ctx, {
@@ -668,10 +827,13 @@
             borderColor: '#007AFF',
             backgroundColor: grad,
             fill: true,
-            tension: 0.35,
+            tension: 0.4,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            borderWidth: 2.5
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#007AFF',
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
+            borderWidth: 2
           }]
         },
         options: {
@@ -699,7 +861,11 @@
             x: {
               grid: {display: false},
               border: {display: false},
-              ticks: {color: 'rgba(0,0,0,0.4)', maxTicksLimit: 8, callback: function(v) { return formatDate(this.getLabelForValue(v)); }}
+              ticks: {
+                color: 'rgba(0,0,0,0.4)', 
+                maxTicksLimit: 8, 
+                callback: function(v) { return formatDate(this.getLabelForValue(v)); }
+              }
             },
             y: {
               grid: {color: 'rgba(0,0,0,0.04)'},
@@ -716,17 +882,28 @@
       const el = document.getElementById('accountsList');
       const groups = {investment: [], cash: [], liability: []};
       
-      groups.investment.push({name: 'RPP - ClearPath 2065', inst: 'Canada Life', bal: currentRPP, manual: true});
+      // Add RPP first
+      groups.investment.push({
+        name: 'RPP - ClearPath 2065', 
+        inst: 'Canada Life', 
+        bal: currentRPP, 
+        manual: true
+      });
       
       inst.forEach(i => {
         const b = i.value || i.balance || i.cash || 0;
         if (Math.abs(b) < 0.01) return;
-        const t = (i.type||i.category||'').toLowerCase();
-        const n = (i.name||'').toLowerCase();
-        const acc = {name: i.name||'Account', inst: i.provider_name||i.providerName||i.name||'', bal: b};
-        if (t.includes('credit')||t.includes('loan')||n.includes('visa')||n.includes('amex')||n.includes('credit')) groups.liability.push(acc);
-        else if (t.includes('chequing')||t.includes('checking')||t.includes('saving')||n.includes('chequing')||n.includes('savings')) groups.cash.push(acc);
-        else groups.investment.push(acc);
+        
+        const category = classifyAccount(i);
+        const acc = {
+          name: i.name || 'Account', 
+          inst: i.provider_name || i.providerName || i.institution || '', 
+          bal: Math.abs(b),
+          rawBal: b
+        };
+        
+        groups[category].push(acc);
+        log(`Classified: ${i.name} -> ${category}`, { balance: b, type: i.type });
       });
       
       const colors = {investment: '#007AFF', cash: '#34C759', liability: '#FF3B30'};
@@ -734,23 +911,29 @@
       
       Object.entries(groups).forEach(([cat, accs]) => {
         if (!accs.length) return;
-        const tot = accs.reduce((s,a) => s + a.bal, 0);
+        const tot = cat === 'liability' 
+          ? accs.reduce((s,a) => s + a.bal, 0) 
+          : accs.reduce((s,a) => s + a.bal, 0);
         const exp = expandedCategories[cat];
+        
         html += `<div class="account-group">
           <div class="account-group-header" onclick="toggleCat('${cat}')">
             <div class="account-group-info">
               <div class="account-group-dot" style="background:${colors[cat]}"></div>
               <span class="account-group-name">${cat}</span>
             </div>
-            <span class="account-group-total">${formatCurrency(tot)}</span>
+            <span class="account-group-total">${cat === 'liability' ? '-' : ''}${formatCurrency(tot)}</span>
           </div>
           ${exp ? accs.map(a => `
             <div class="account-row ${a.manual?'manual':''}">
               <div class="account-info">
                 <div class="account-icon" style="background:${colors[cat]}15;color:${colors[cat]}">${a.name[0].toUpperCase()}</div>
-                <div><div class="account-name">${a.name}</div><div class="account-institution">${a.inst}${a.manual?' • Manual':''}</div></div>
+                <div>
+                  <div class="account-name">${a.name}</div>
+                  <div class="account-institution">${a.inst}${a.manual?' • Manual':''}</div>
+                </div>
               </div>
-              <span class="account-balance ${cat==='liability'?'negative':''}">${cat==='liability'?'-':''}${formatFull(Math.abs(a.bal))}</span>
+              <span class="account-balance ${cat==='liability'?'negative':''}">${cat==='liability'?'-':''}${formatFull(a.bal)}</span>
             </div>
           `).join('') : ''}
         </div>`;
@@ -762,17 +945,47 @@
     function renderHoldings() {
       const pos = wealthicaData.positions || [];
       const el = document.getElementById('holdingsList');
-      if (!pos.length) { el.innerHTML = '<div class="empty-state">No holdings</div>'; return; }
       
+      if (!pos.length) { 
+        el.innerHTML = '<div class="empty-state">No holdings data available</div>'; 
+        return; 
+      }
+      
+      // Sort by value descending
       const sorted = [...pos].sort((a,b) => (b.value||0) - (a.value||0));
-      el.innerHTML = sorted.slice(0,15).map(p => {
-        const sym = p.security?.symbol || p.symbol || '?';
-        const name = p.security?.name || p.name || '';
-        const val = p.value || 0;
-        const qty = p.quantity || 0;
+      
+      el.innerHTML = sorted.map(p => {
+        // Handle various Wealthica data structures
+        const sym = p.security?.symbol || p.symbol || p.ticker || '?';
+        const name = p.security?.name || p.name || p.security?.description || '';
+        const val = p.value || p.market_value || 0;
+        const qty = p.quantity || p.units || p.shares || 0;
+        const cost = p.book_value || p.cost || p.book || 0;
+        const avgCost = qty > 0 ? cost / qty : 0;
+        const gain = val - cost;
+        const gainPct = cost > 0 ? (gain / cost * 100) : 0;
+        const isPositive = gain >= 0;
+        
         return `<div class="holding-row">
-          <div><div class="holding-symbol">${sym}</div><div class="holding-name">${name.substring(0,25)}</div></div>
-          <div style="text-align:right"><div class="holding-amount">${formatFull(val)}</div><div class="holding-shares">${qty.toFixed(2)} units</div></div>
+          <div class="holding-info">
+            <div class="holding-symbol">${sym}</div>
+            <div class="holding-name">${name.substring(0,30)}</div>
+          </div>
+          <div class="holding-col">
+            <div class="holding-col-label">Shares</div>
+            <div class="holding-col-value">${qty.toFixed(2)}</div>
+          </div>
+          <div class="holding-col">
+            <div class="holding-col-label">Avg Cost</div>
+            <div class="holding-col-value">${avgCost > 0 ? formatFull(avgCost) : '--'}</div>
+          </div>
+          <div class="holding-col">
+            <div class="holding-col-label">Value</div>
+            <div class="holding-col-value">${formatFull(val)}</div>
+            <div class="holding-col-sub ${isPositive ? 'gain-positive' : 'gain-negative'}">
+              ${isPositive ? '+' : ''}${formatFull(gain)} (${isPositive ? '+' : ''}${gainPct.toFixed(1)}%)
+            </div>
+          </div>
         </div>`;
       }).join('');
     }
@@ -792,26 +1005,48 @@
         type: 'doughnut',
         data: {
           labels: data.map(d => d.label),
-          datasets: [{data: data.map(d => d.value), backgroundColor: data.map(d => d.color), borderWidth: 0}]
+          datasets: [{
+            data: data.map(d => d.value), 
+            backgroundColor: data.map(d => d.color), 
+            borderWidth: 0
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           cutout: '70%',
           plugins: {
-            legend: {position: 'right', labels: {color: 'rgba(0,0,0,0.6)', padding: 12, usePointStyle: true}},
-            tooltip: {callbacks: {label: c => `${c.label}: ${formatFull(c.raw)}`}}
+            legend: {
+              position: 'right', 
+              labels: {
+                color: 'rgba(0,0,0,0.6)', 
+                padding: 12, 
+                usePointStyle: true
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: c => `${c.label}: ${formatFull(c.raw)}`
+              }
+            }
           }
         }
       });
     }
     
-    function toggleCat(c) { expandedCategories[c] = !expandedCategories[c]; renderAccounts(); }
+    function toggleCat(c) { 
+      expandedCategories[c] = !expandedCategories[c]; 
+      renderAccounts(); 
+    }
     window.toggleCat = toggleCat;
     
     function saveRPP() {
       const v = parseFloat(document.getElementById('rppInput').value);
-      if (!isNaN(v) && v >= 0) { currentRPP = v; localStorage.setItem('wealthengine-rpp', v); render(); }
+      if (!isNaN(v) && v >= 0) { 
+        currentRPP = v; 
+        localStorage.setItem('wealthengine-rpp', v); 
+        render(); 
+      }
     }
     
     document.addEventListener('DOMContentLoaded', () => {
