@@ -277,6 +277,37 @@
       .main-grid { grid-template-columns: 1fr; }
     }
     
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      margin-right: 12px;
+    }
+    
+    .toggle-label input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+    
+    .equities-section {
+      padding: 24px;
+    }
+    
+    .equities-chart {
+      height: 280px;
+    }
+
     .holdings-section, .accounts-section {
       padding: 24px;
     }
@@ -541,6 +572,10 @@
       <div class="section-header">
         <h2 class="section-title">Net Worth</h2>
         <div class="chart-controls">
+          <label class="toggle-label">
+            <input type="checkbox" id="excludeLiabilities">
+            <span>Assets Only</span>
+          </label>
           <button class="chart-btn" data-range="6">6M</button>
           <button class="chart-btn" data-range="12">1Y</button>
           <button class="chart-btn" data-range="24">2Y</button>
@@ -553,18 +588,29 @@
     </div>
     
     <div class="main-grid">
-      <div class="holdings-section glass-panel">
-        <div class="section-header">
-          <h2 class="section-title">Holdings</h2>
+      <div class="left-column">
+        <div class="holdings-section glass-panel">
+          <div class="section-header">
+            <h2 class="section-title">Holdings</h2>
+          </div>
+          <div class="holdings-header">
+            <span>Symbol</span>
+            <span>Shares</span>
+            <span>Avg Cost</span>
+            <span>Value / Gain</span>
+          </div>
+          <div id="holdingsList" class="holdings-list">
+            <div class="empty-state">Loading...</div>
+          </div>
         </div>
-        <div class="holdings-header">
-          <span>Symbol</span>
-          <span>Shares</span>
-          <span>Avg Cost</span>
-          <span>Value / Gain</span>
-        </div>
-        <div id="holdingsList" class="holdings-list">
-          <div class="empty-state">Loading...</div>
+        
+        <div class="equities-section glass-panel">
+          <div class="section-header">
+            <h2 class="section-title">Equities & ETFs Breakdown</h2>
+          </div>
+          <div class="equities-chart">
+            <canvas id="equitiesChart"></canvas>
+          </div>
         </div>
       </div>
       
@@ -618,6 +664,8 @@
     let wealthicaData = { history: [], positions: [], institutions: [] };
     let netWorthChart = null;
     let allocationChart = null;
+    let equitiesChart = null;
+    let excludeLiabilities = false;
     let chartRange = 'all';
     let expandedCategories = { investment: true, cash: true, liability: true };
     let debugMode = false;
@@ -739,10 +787,19 @@
       p.style.color = isErr ? '#FF3B30' : '#34C759';
     }
     
-    function processHistory() {
+    function processHistory(assetsOnly = false) {
       return (wealthicaData.history || []).map(p => {
         const d = p.date || p.d;
-        const w = p.value || p.networth || p.v || 0;
+        let w = p.value || p.networth || p.v || 0;
+        
+        // If assets only, we need to add back the liabilities that were subtracted
+        // The Wealthica networth already has liabilities subtracted, so we estimate
+        // Note: This is an approximation since we don't have historical liability data
+        if (assetsOnly) {
+          const currentLiab = calcTotals().liab;
+          w = w + currentLiab; // Add back current liabilities as estimate
+        }
+        
         const r = getRPP(d);
         return {date: d, wealthica: w, rpp: r, corrected: w + r};
       }).sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -771,6 +828,7 @@
       renderAccounts();
       renderHoldings();
       renderAllocation();
+      renderEquitiesChart();
     }
     
     function renderStats() {
@@ -804,7 +862,7 @@
     }
     
     function renderChart() {
-      const h = processHistory();
+      const h = processHistory(excludeLiabilities);
       if (!h.length) {
         log('No history data');
         return;
@@ -1050,8 +1108,21 @@
         return; 
       }
       
+      // Filter out goPeer loans (they show as "Loan #XXXXX" or from goPeer institution)
+      const filtered = pos.filter(p => {
+        const sym = (p.security?.symbol || p.symbol || p.ticker || '').toLowerCase();
+        const name = (p.security?.name || p.name || '').toLowerCase();
+        const inst = (p.institution || '').toLowerCase();
+        
+        // Exclude if it looks like a goPeer loan
+        if (sym.includes('loan') || name.includes('loan #') || inst.includes('gopeer')) {
+          return false;
+        }
+        return true;
+      });
+      
       // Sort by value descending
-      const sorted = [...pos].sort((a,b) => (b.value||0) - (a.value||0));
+      const sorted = [...filtered].sort((a,b) => (b.value||0) - (a.value||0));
       
       el.innerHTML = sorted.map(p => {
         // Handle various Wealthica data structures
@@ -1133,6 +1204,98 @@
       });
     }
     
+    function renderEquitiesChart() {
+      const pos = wealthicaData.positions || [];
+      const ctx = document.getElementById('equitiesChart').getContext('2d');
+      if (equitiesChart) equitiesChart.destroy();
+      
+      // Filter to only equities and ETFs (exclude loans, cash, crypto by symbol patterns)
+      const equities = pos.filter(p => {
+        const sym = (p.security?.symbol || p.symbol || p.ticker || '').toUpperCase();
+        const name = (p.security?.name || p.name || '').toLowerCase();
+        const val = p.value || 0;
+        
+        // Exclude if no value or very small
+        if (val < 10) return false;
+        
+        // Exclude loans
+        if (sym.includes('LOAN') || name.includes('loan #')) return false;
+        
+        // Exclude cash positions
+        if (sym === 'CAD' || sym === 'USD' || name.includes('canadian dollar')) return false;
+        
+        // Exclude crypto (common crypto symbols)
+        const cryptoSymbols = ['BTC', 'ETH', 'SOL', 'ADA', 'DOT', 'MATIC', 'AVAX', 'LINK'];
+        if (cryptoSymbols.includes(sym)) return false;
+        
+        return true;
+      });
+      
+      // Sort by value and take top holdings
+      const sorted = [...equities].sort((a,b) => (b.value||0) - (a.value||0));
+      
+      // Generate colors
+      const colors = [
+        '#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF9500',
+        '#FFCC00', '#34C759', '#00C7BE', '#30B0C7', '#32ADE6'
+      ];
+      
+      const data = sorted.slice(0, 10).map((p, i) => ({
+        label: p.security?.symbol || p.symbol || p.ticker || '?',
+        value: p.value || 0,
+        color: colors[i % colors.length]
+      }));
+      
+      // Add "Other" category if there are more
+      if (sorted.length > 10) {
+        const otherValue = sorted.slice(10).reduce((sum, p) => sum + (p.value || 0), 0);
+        if (otherValue > 0) {
+          data.push({ label: 'Other', value: otherValue, color: '#8E8E93' });
+        }
+      }
+      
+      if (!data.length) {
+        return;
+      }
+      
+      equitiesChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: data.map(d => d.label),
+          datasets: [{
+            data: data.map(d => d.value),
+            backgroundColor: data.map(d => d.color),
+            borderWidth: 2,
+            borderColor: '#fff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                color: 'rgba(0,0,0,0.6)',
+                padding: 8,
+                usePointStyle: true,
+                font: { size: 11 }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: c => {
+                  const total = c.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = ((c.raw / total) * 100).toFixed(1);
+                  return `${c.label}: ${formatFull(c.raw)} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
     function toggleCat(c) { 
       expandedCategories[c] = !expandedCategories[c]; 
       renderAccounts(); 
@@ -1151,6 +1314,13 @@
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('rppSave').onclick = saveRPP;
       document.getElementById('rppInput').onkeypress = e => { if (e.key === 'Enter') saveRPP(); };
+      
+      // Assets only toggle
+      document.getElementById('excludeLiabilities').onchange = (e) => {
+        excludeLiabilities = e.target.checked;
+        renderChart();
+      };
+      
       document.querySelectorAll('.chart-btn').forEach(b => {
         b.onclick = () => {
           chartRange = b.dataset.range;
